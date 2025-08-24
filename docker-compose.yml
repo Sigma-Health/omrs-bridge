@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  openmrs-bridge:
+    build: .
+    ports:
+      - "1221:1221"
+    environment:
+      # Database configuration
+      - DB_HOST=${DB_HOST:-localhost}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_NAME=${DB_NAME:-openmrs}
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-}
+      
+      # API configuration
+      - API_KEYS=${API_KEYS:-}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this-in-production}
+      
+      # Application settings
+      - PORT=1221
+      - HOST=0.0.0.0
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - openmrs-network
+    depends_on:
+      - mysql
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-password}
+      - MYSQL_DATABASE=${DB_NAME:-openmrs}
+      - MYSQL_USER=${DB_USER:-openmrs}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-openmrs}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - openmrs-network
+    restart: unless-stopped
+
+networks:
+  openmrs-network:
+    driver: bridge
+
+volumes:
+  mysql_data: 
