@@ -25,32 +25,15 @@ services:
     restart: unless-stopped
     networks:
       - bahmni_default  # Connect to Bahmni's default network
-    # Remove depends_on since we're using external database
-    # depends_on:
-    #   - mysql
-
-  # Remove the MySQL service since we're using Bahmni's database
-  # mysql:
-  #   image: mysql:8.0
-  #   environment:
-  #     - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-password}
-  #     - MYSQL_DATABASE=${DB_NAME:-openmrs}
-  #     - MYSQL_USER=${DB_USER:-openmrs}
-  #     - MYSQL_PASSWORD=${DB_PASSWORD:-openmrs}
-  #   ports:
-  #     - "3306:3306"
-  #   volumes:
-  #     - mysql_data:/var/lib/mysql
-  #     - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-  #   networks:
-  #     - openmrs-network
-  #   restart: unless-stopped
+    # Add health check to ensure database is available
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1221/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 # Use external network (Bahmni's network)
 networks:
   bahmni_default:
-    external: true
-
-# Remove volumes since we're not using local MySQL
-# volumes:
-#   mysql_data: 
+    external: true 
