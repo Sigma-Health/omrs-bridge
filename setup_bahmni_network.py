@@ -37,7 +37,8 @@ def find_bahmni_networks():
             parts = line.split('\t')
             if len(parts) >= 2:
                 name, driver, scope = parts[0], parts[1], parts[2] if len(parts) > 2 else 'local'
-                if 'bahmni' in name.lower() or 'openmrs' in name.lower():
+                # Check for Bahmni-related networks (including bahmni-standard_default)
+                if any(pattern in name.lower() for pattern in ['bahmni', 'openmrs', 'standard']):
                     networks.append((name, driver, scope))
     
     # If no networks found, check for common Bahmni network patterns
