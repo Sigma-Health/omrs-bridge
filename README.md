@@ -529,7 +529,8 @@ If the automatic detection doesn't work, try these common network names:
 ```yaml
 # In docker-compose.bahmni.yml, update the network name:
 networks:
-  bahmni_default:  # Try these alternatives:
+  bahmni-standard_default:  # Most common for Bahmni Standard
+  # bahmni_default:
   # bahmni_bahmni:
   # openmrs_default:
   # bahmni-network:

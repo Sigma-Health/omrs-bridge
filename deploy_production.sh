@@ -93,9 +93,9 @@ mkdir -p logs data ssl
 
 # Check if Bahmni network exists
 print_status "Checking Bahmni network"
-if ! docker network ls | grep -q "bahmni_default"; then
+if ! docker network ls | grep -q "bahmni-standard_default"; then
     print_warning "Bahmni network not found. Creating it..."
-    docker network create bahmni_default
+    docker network create bahmni-standard_default
 fi
 
 # Build the application

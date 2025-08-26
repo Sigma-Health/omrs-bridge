@@ -24,7 +24,7 @@ services:
       - ./logs:/app/logs
     restart: unless-stopped
     networks:
-      - bahmni_default  # Connect to Bahmni's default network
+      - bahmni-standard_default  # Connect to Bahmni's default network
     # Add health check to ensure database is available
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:1221/health"]
@@ -35,5 +35,5 @@ services:
 
 # Use external network (Bahmni's network)
 networks:
-  bahmni_default:
+  bahmni-standard_default:
     external: true 

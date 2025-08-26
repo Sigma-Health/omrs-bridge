@@ -40,6 +40,17 @@ def find_bahmni_networks():
                 if 'bahmni' in name.lower() or 'openmrs' in name.lower():
                     networks.append((name, driver, scope))
     
+    # If no networks found, check for common Bahmni network patterns
+    if not networks:
+        for line in lines:
+            if line.strip():
+                parts = line.split('\t')
+                if len(parts) >= 2:
+                    name, driver, scope = parts[0], parts[1], parts[2] if len(parts) > 2 else 'local'
+                    # Check for common Bahmni network naming patterns
+                    if any(pattern in name.lower() for pattern in ['bahmni', 'openmrs', 'standard']):
+                        networks.append((name, driver, scope))
+    
     return networks
 
 
@@ -117,6 +128,33 @@ DEBUG=true
     print("✅ Created .env.bahmni template")
 
 
+def update_config_files(network_name):
+    """Update docker-compose files with the correct network name"""
+    files_to_update = [
+        'docker-compose.bahmni.yml',
+        'docker-compose.prod.yml'
+    ]
+    
+    for filename in files_to_update:
+        if Path(filename).exists():
+            try:
+                with open(filename, 'r') as f:
+                    content = f.read()
+                
+                # Replace network references
+                content = content.replace('bahmni_default', network_name)
+                content = content.replace('bahmni-standard_default', network_name)
+                
+                with open(filename, 'w') as f:
+                    f.write(content)
+                
+                print(f"✅ Updated {filename} with network: {network_name}")
+            except Exception as e:
+                print(f"⚠️  Could not update {filename}: {e}")
+        else:
+            print(f"⚠️  {filename} not found, skipping update")
+
+
 def main():
     """Main function"""
     print("🚀 OpenMRS Bridge - Bahmni Network Setup")
@@ -149,7 +187,7 @@ def main():
         
         return
     
-    print(f"\n✅ Found {len(networks)} potential Bahmni networks:")
+    print(f"\n✅ Found {len(networks)} Bahmni network(s):")
     for i, (name, driver, scope) in enumerate(networks, 1):
         print(f"{i}. {name} ({driver}, {scope})")
     
@@ -174,6 +212,10 @@ def main():
     if networks:
         print(f"\n💡 Recommended network: {networks[0][0]}")
         print("If this doesn't work, try the other networks listed above")
+        
+        # Update the docker-compose files with the correct network name
+        print(f"\n📝 Updating configuration files with network: {networks[0][0]}")
+        update_config_files(networks[0][0])
 
 
 if __name__ == "__main__":

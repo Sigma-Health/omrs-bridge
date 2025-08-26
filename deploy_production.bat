@@ -47,10 +47,10 @@ if not exist "ssl" mkdir ssl
 
 REM Check if Bahmni network exists
 echo ✅ Checking Bahmni network
-docker network ls | findstr "bahmni_default" >nul 2>&1
+docker network ls | findstr "bahmni-standard_default" >nul 2>&1
 if errorlevel 1 (
     echo ⚠️  Bahmni network not found. Creating it...
-    docker network create bahmni_default
+    docker network create bahmni-standard_default
 )
 
 REM Build the application
