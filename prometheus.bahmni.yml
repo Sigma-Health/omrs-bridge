@@ -1,0 +1,73 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9099']
+
+  # OpenMRS Bridge API
+  - job_name: 'openmrs-bridge'
+    static_configs:
+      - targets: ['openmrs-bridge-bahmni:1221']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    honor_labels: true
+
+  # Nginx metrics (if nginx-exporter is available)
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx-proxy:80']
+    metrics_path: '/nginx_status'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-cache:6379']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Node exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['localhost:9100']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Custom metrics endpoint
+  - job_name: 'openmrs-bridge-custom'
+    static_configs:
+      - targets: ['openmrs-bridge-bahmni:1221']
+    metrics_path: '/stats'
+    scrape_interval: 60s
+    scrape_timeout: 15s
+    honor_labels: true
+
+  # Health check endpoint
+  - job_name: 'openmrs-bridge-health'
+    static_configs:
+      - targets: ['openmrs-bridge-bahmni:1221']
+    metrics_path: '/health'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    honor_labels: true
+
+# Alerting rules (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Recording rules for common queries
+rule_files:
+  - "recording_rules.yml" 

@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.api.orders import router as orders_router
+from app.api.observations import router as observations_router
 from app.config import settings
 from app.auth import generate_api_key
 import logging
@@ -66,7 +67,8 @@ async def generate_new_api_key():
 
 
 # Include routers
-app.include_router(orders_router, prefix="/api/v1")
+app.include_router(orders_router, prefix="/api/v1/orders", tags=["orders"])
+app.include_router(observations_router, prefix="/api/v1/observations", tags=["observations"])
 
 
 # Root endpoint
