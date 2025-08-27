@@ -4,15 +4,31 @@ from typing import List, Optional
 from app.database import get_db
 from app.auth import get_current_api_key
 from app.crud import (
-    get_obs, get_obs_by_uuid, update_obs_partial, update_obs_partial_by_uuid,
+    create_obs, get_obs, get_obs_by_uuid, update_obs_partial, update_obs_partial_by_uuid,
     update_obs_full, update_obs_full_by_uuid, get_updated_obs_fields,
     list_obs, get_obs_by_person, get_obs_by_encounter, get_obs_by_concept, get_obs_by_order
 )
 from app.schemas import (
-    ObsUpdate, ObsReplace, ObsResponse, ObsUpdateResponse, ErrorResponse
+    ObsCreate, ObsUpdate, ObsReplace, ObsResponse, ObsUpdateResponse, ErrorResponse
 )
 
 router = APIRouter()
+
+
+@router.post("/", response_model=ObsResponse)
+async def create_observation(
+    obs_create: ObsCreate,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key)
+):
+    """
+    Create a new observation
+    """
+    try:
+        new_obs = create_obs(db, obs_create)
+        return new_obs
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create observation: {str(e)}")
 
 
 @router.get("/", response_model=List[ObsResponse])

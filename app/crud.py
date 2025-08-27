@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.models import Order, Obs
-from app.schemas import OrderUpdate, OrderReplace, ObsUpdate, ObsReplace
+from app.schemas import OrderUpdate, OrderReplace, ObsUpdate, ObsReplace, ObsCreate
 from typing import Optional, List
 from datetime import datetime
 
@@ -162,6 +162,31 @@ def get_orders_by_patient(db: Session, patient_id: int, skip: int = 0, limit: in
 # ============================================================================
 # OBSERVATION (OBS) CRUD OPERATIONS
 # ============================================================================
+
+def create_obs(db: Session, obs_create: ObsCreate) -> Obs:
+    """Create a new observation"""
+    # Generate UUID for new observation
+    import uuid
+    obs_uuid = str(uuid.uuid4())
+    
+    # Create observation data
+    obs_data = obs_create.dict()
+    obs_data['uuid'] = obs_uuid
+    obs_data['date_created'] = datetime.utcnow()
+    obs_data['voided'] = False
+    
+    # Create new observation
+    db_obs = Obs(**obs_data)
+    
+    try:
+        db.add(db_obs)
+        db.commit()
+        db.refresh(db_obs)
+        return db_obs
+    except Exception as e:
+        db.rollback()
+        raise e
+
 
 def get_obs(db: Session, obs_id: int) -> Optional[Obs]:
     """Get observation by ID"""

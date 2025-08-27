@@ -93,6 +93,15 @@ def check_openapi_schema(base_url: str) -> bool:
                 print(f"✅ Found {len(obs_endpoints)} observations endpoints in OpenAPI schema:")
                 for endpoint in obs_endpoints:
                     print(f"   • {endpoint}")
+                
+                # Check specifically for POST endpoint
+                post_endpoint = "/api/v1/observations/"
+                if post_endpoint in paths and "post" in paths[post_endpoint]:
+                    print("✅ POST endpoint for creating observations is available")
+                else:
+                    print("❌ POST endpoint for creating observations is missing")
+                    return False
+                
                 return True
             else:
                 print("❌ No observations endpoints found in OpenAPI schema")
