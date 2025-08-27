@@ -15,6 +15,80 @@ from app.schemas import (
 router = APIRouter()
 
 
+@router.get("/", response_model=List[ObsResponse])
+async def list_observations(
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key)
+):
+    """
+    List observations with pagination
+    """
+    obs_list = list_obs(db, skip=skip, limit=limit)
+    return obs_list
+
+
+@router.get("/person/{person_id}", response_model=List[ObsResponse])
+async def get_observations_by_person(
+    person_id: int,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key)
+):
+    """
+    Get observations for a specific person
+    """
+    obs_list = get_obs_by_person(db, person_id, skip=skip, limit=limit)
+    return obs_list
+
+
+@router.get("/encounter/{encounter_id}", response_model=List[ObsResponse])
+async def get_observations_by_encounter(
+    encounter_id: int,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key)
+):
+    """
+    Get observations for a specific encounter
+    """
+    obs_list = get_obs_by_encounter(db, encounter_id, skip=skip, limit=limit)
+    return obs_list
+
+
+@router.get("/concept/{concept_id}", response_model=List[ObsResponse])
+async def get_observations_by_concept(
+    concept_id: int,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key)
+):
+    """
+    Get observations for a specific concept
+    """
+    obs_list = get_obs_by_concept(db, concept_id, skip=skip, limit=limit)
+    return obs_list
+
+
+@router.get("/order/{order_id}", response_model=List[ObsResponse])
+async def get_observations_by_order(
+    order_id: int,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key)
+):
+    """
+    Get observations for a specific order
+    """
+    obs_list = get_obs_by_order(db, order_id, skip=skip, limit=limit)
+    return obs_list
+
+
 @router.get("/{uuid}", response_model=ObsResponse)
 async def get_observation(
     uuid: str,
@@ -93,78 +167,4 @@ async def replace_observation(
         obs_id=updated_obs.obs_id,
         updated_fields=updated_fields,
         obs=updated_obs
-    )
-
-
-@router.get("/", response_model=List[ObsResponse])
-async def list_observations(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
-    db: Session = Depends(get_db),
-    api_key: str = Depends(get_current_api_key)
-):
-    """
-    List observations with pagination
-    """
-    obs_list = list_obs(db, skip=skip, limit=limit)
-    return obs_list
-
-
-@router.get("/person/{person_id}", response_model=List[ObsResponse])
-async def get_observations_by_person(
-    person_id: int,
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
-    db: Session = Depends(get_db),
-    api_key: str = Depends(get_current_api_key)
-):
-    """
-    Get observations for a specific person
-    """
-    obs_list = get_obs_by_person(db, person_id, skip=skip, limit=limit)
-    return obs_list
-
-
-@router.get("/encounter/{encounter_id}", response_model=List[ObsResponse])
-async def get_observations_by_encounter(
-    encounter_id: int,
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
-    db: Session = Depends(get_db),
-    api_key: str = Depends(get_current_api_key)
-):
-    """
-    Get observations for a specific encounter
-    """
-    obs_list = get_obs_by_encounter(db, encounter_id, skip=skip, limit=limit)
-    return obs_list
-
-
-@router.get("/concept/{concept_id}", response_model=List[ObsResponse])
-async def get_observations_by_concept(
-    concept_id: int,
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
-    db: Session = Depends(get_db),
-    api_key: str = Depends(get_current_api_key)
-):
-    """
-    Get observations for a specific concept
-    """
-    obs_list = get_obs_by_concept(db, concept_id, skip=skip, limit=limit)
-    return obs_list
-
-
-@router.get("/order/{order_id}", response_model=List[ObsResponse])
-async def get_observations_by_order(
-    order_id: int,
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
-    db: Session = Depends(get_db),
-    api_key: str = Depends(get_current_api_key)
-):
-    """
-    Get observations for a specific order
-    """
-    obs_list = get_obs_by_order(db, order_id, skip=skip, limit=limit)
-    return obs_list 
+    ) 
