@@ -1,10 +1,8 @@
 version: '3.8'
 
 services:
-  openmrs-bridge-bahmni:
-    build:
-      context: .
-      dockerfile: Dockerfile.optimized
+  openmrs-bridge:
+    build: .
     ports:
       - "1221:1221"
     environment:
@@ -22,155 +20,17 @@ services:
       # Application settings
       - PORT=1221
       - HOST=0.0.0.0
-      - DEBUG=false
-      - PRODUCTION=true
-      
-      # Performance settings for Bahmni integration
-      - WORKERS=2
-      - MAX_CONNECTIONS=500
-      - CONNECTION_TIMEOUT=30
-      - POOL_SIZE=10
-      - MAX_OVERFLOW=20
-      
     volumes:
       - ./logs:/app/logs
-      - ./data:/app/data
     restart: unless-stopped
-    
-    # Performance optimizations
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '1.0'
-        reservations:
-          memory: 256M
-          cpus: '0.5'
-    
-    # Connect to Bahmni's default network
     networks:
       - bahmni-standard_default
-    
-    # Health check with Bahmni-specific settings
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:1221/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
-    
-    # Logging configuration
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    
-    # Security settings
-    security_opt:
-      - no-new-privileges:true
-    read_only: false
-    tmpfs:
-      - /tmp:noexec,nosuid,size=50m
-
-  # Redis for caching (optional, for better performance)
-  redis-cache:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
-    networks:
-      - bahmni-standard_default
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Nginx reverse proxy for load balancing (optional)
-  nginx-proxy:
-    image: nginx:alpine
-    ports:
-      - "8090:80"  # Changed from 80 to 8090 to avoid conflict
-      - "8443:443"  # Changed from 443 to 8443 to avoid conflict
-    volumes:
-      - ./nginx.bahmni.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - openmrs-bridge-bahmni
-    restart: unless-stopped
-    networks:
-      - bahmni-standard_default
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: '0.25'
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Monitoring with Prometheus (optional)
-  prometheus-bahmni:
-    image: prom/prometheus:latest
-    ports:
-      - "9099:9090"  # Changed from 9090 to 9099
-    volumes:
-      - ./prometheus.bahmni.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_bahmni_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    restart: unless-stopped
-    networks:
-      - bahmni-standard_default
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.5'
-
-  # Grafana for visualization (optional)
-  grafana-bahmni:
-    image: grafana/grafana:latest
-    ports:
-      - "3111:3000"  # Changed from 3000 to 3111
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_SECURITY_ADMIN_USER=admin
-    volumes:
-      - grafana_bahmni_data:/var/lib/grafana
-      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
-    depends_on:
-      - prometheus-bahmni
-    restart: unless-stopped
-    networks:
-      - bahmni-standard_default
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.5'
-
-volumes:
-  redis_data:
-  prometheus_bahmni_data:
-  grafana_bahmni_data:
+      start_period: 40s
 
 # Use external network (Bahmni's network)
 networks:

@@ -9,7 +9,10 @@ from typing import AsyncGenerator
 def get_async_database_url():
     """Convert MySQL URL to async format for aiomysql"""
     url = get_database_url()
-    if url.startswith('mysql://'):
+    # Handle both mysql:// and mysql+pymysql:// formats
+    if url.startswith('mysql+pymysql://'):
+        return url.replace('mysql+pymysql://', 'mysql+aiomysql://', 1)
+    elif url.startswith('mysql://'):
         return url.replace('mysql://', 'mysql+aiomysql://', 1)
     return url
 
