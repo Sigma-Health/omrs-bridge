@@ -22,7 +22,7 @@ from app.schemas import (
 from app.models import Order
 from app.utils import validate_uuid
 
-router = APIRouter(prefix="/orders", tags=["orders"])
+router = APIRouter(tags=["orders"])
 
 
 @router.patch(
