@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from app.models import Order, Obs
-from app.schemas import OrderUpdate, OrderReplace, ObsUpdate, ObsReplace, ObsCreate
+from app.models import Order, Obs, Concept
+from app.schemas import OrderUpdate, OrderReplace, ObsUpdate, ObsReplace, ObsCreate, ConceptUpdate, ConceptReplace, ConceptCreate
 from typing import Optional, List
 from datetime import datetime
 
@@ -354,4 +354,237 @@ def get_obs_by_order(db: Session, order_id: int, skip: int = 0, limit: int = 100
     """Get observations for a specific order"""
     return db.query(Obs).filter(
         and_(Obs.order_id == order_id, Obs.voided == False)
+    ).offset(skip).limit(limit).all()
+
+
+# ============================================================================
+# CONCEPT CRUD OPERATIONS
+# ============================================================================
+
+def create_concept(db: Session, concept_create: ConceptCreate) -> Concept:
+    """Create a new concept"""
+    # Generate UUID for new concept
+    import uuid
+    concept_uuid = str(uuid.uuid4())
+    
+    # Create concept data
+    concept_data = concept_create.dict()
+    concept_data['uuid'] = concept_uuid
+    concept_data['date_created'] = datetime.utcnow()
+    concept_data['retired'] = False
+    
+    # Create new concept
+    db_concept = Concept(**concept_data)
+    
+    try:
+        db.add(db_concept)
+        db.commit()
+        db.refresh(db_concept)
+        return db_concept
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def get_concept(db: Session, concept_id: int) -> Optional[Concept]:
+    """Get concept by ID"""
+    return db.query(Concept).filter(Concept.concept_id == concept_id).first()
+
+
+def get_concept_by_uuid(db: Session, uuid: str) -> Optional[Concept]:
+    """Get concept by UUID"""
+    return db.query(Concept).filter(Concept.uuid == uuid).first()
+
+
+def update_concept_partial(db: Session, concept_id: int, concept_update: ConceptUpdate) -> Optional[Concept]:
+    """
+    Update concept partially (PATCH) by ID
+    Only updates provided fields
+    """
+    db_concept = get_concept(db, concept_id)
+    if not db_concept:
+        return None
+    
+    # Get update data, excluding None values
+    update_data = concept_update.dict(exclude_unset=True)
+    
+    if not update_data:
+        return db_concept
+    
+    # Update fields
+    for field, value in update_data.items():
+        if hasattr(db_concept, field):
+            setattr(db_concept, field, value)
+    
+    # Set changed_by and date_changed if any field was updated
+    if update_data:
+        db_concept.changed_by = update_data.get('changed_by', db_concept.changed_by)
+        db_concept.date_changed = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(db_concept)
+        return db_concept
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def update_concept_partial_by_uuid(db: Session, uuid: str, concept_update: ConceptUpdate) -> Optional[Concept]:
+    """
+    Update concept partially (PATCH) by UUID
+    Only updates provided fields
+    """
+    db_concept = get_concept_by_uuid(db, uuid)
+    if not db_concept:
+        return None
+    
+    # Get update data, excluding None values
+    update_data = concept_update.dict(exclude_unset=True)
+    
+    if not update_data:
+        return db_concept
+    
+    # Update fields
+    for field, value in update_data.items():
+        if hasattr(db_concept, field):
+            setattr(db_concept, field, value)
+    
+    # Set changed_by and date_changed if any field was updated
+    if update_data:
+        db_concept.changed_by = update_data.get('changed_by', db_concept.changed_by)
+        db_concept.date_changed = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(db_concept)
+        return db_concept
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def update_concept_full(db: Session, concept_id: int, concept_replace: ConceptReplace) -> Optional[Concept]:
+    """
+    Replace concept completely (PUT) by ID
+    Updates all fields with provided values
+    """
+    db_concept = get_concept(db, concept_id)
+    if not db_concept:
+        return None
+    
+    # Get all data from the replace schema
+    replace_data = concept_replace.dict()
+    
+    # Update all fields
+    for field, value in replace_data.items():
+        if hasattr(db_concept, field):
+            setattr(db_concept, field, value)
+    
+    # Set changed_by and date_changed
+    db_concept.changed_by = replace_data.get('changed_by', db_concept.changed_by)
+    db_concept.date_changed = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(db_concept)
+        return db_concept
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def update_concept_full_by_uuid(db: Session, uuid: str, concept_replace: ConceptReplace) -> Optional[Concept]:
+    """
+    Replace concept completely (PUT) by UUID
+    Updates all fields with provided values
+    """
+    db_concept = get_concept_by_uuid(db, uuid)
+    if not db_concept:
+        return None
+    
+    # Get all data from the replace schema
+    replace_data = concept_replace.dict()
+    
+    # Update all fields
+    for field, value in replace_data.items():
+        if hasattr(db_concept, field):
+            setattr(db_concept, field, value)
+    
+    # Set changed_by and date_changed
+    db_concept.changed_by = replace_data.get('changed_by', db_concept.changed_by)
+    db_concept.date_changed = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(db_concept)
+        return db_concept
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def get_updated_concept_fields(original_concept: Concept, updated_concept: Concept) -> List[str]:
+    """Get list of fields that were updated"""
+    updated_fields = []
+    
+    # Compare all fields
+    for field in Concept.__table__.columns:
+        field_name = field.name
+        original_value = getattr(original_concept, field_name)
+        updated_value = getattr(updated_concept, field_name)
+        
+        if original_value != updated_value:
+            updated_fields.append(field_name)
+    
+    return updated_fields
+
+
+def list_concepts(db: Session, skip: int = 0, limit: int = 100) -> List[Concept]:
+    """List concepts with pagination"""
+    return db.query(Concept).offset(skip).limit(limit).all()
+
+
+def get_concepts_by_datatype(db: Session, datatype_id: int, skip: int = 0, limit: int = 100) -> List[Concept]:
+    """Get concepts for a specific datatype"""
+    return db.query(Concept).filter(
+        and_(Concept.datatype_id == datatype_id, Concept.retired == False)
+    ).offset(skip).limit(limit).all()
+
+
+def get_concepts_by_class(db: Session, class_id: int, skip: int = 0, limit: int = 100) -> List[Concept]:
+    """Get concepts for a specific class"""
+    return db.query(Concept).filter(
+        and_(Concept.class_id == class_id, Concept.retired == False)
+    ).offset(skip).limit(limit).all()
+
+
+def get_concepts_by_creator(db: Session, creator: int, skip: int = 0, limit: int = 100) -> List[Concept]:
+    """Get concepts created by a specific user"""
+    return db.query(Concept).filter(
+        and_(Concept.creator == creator, Concept.retired == False)
+    ).offset(skip).limit(limit).all()
+
+
+def search_concepts_by_name(db: Session, name: str, skip: int = 0, limit: int = 100) -> List[Concept]:
+    """Search concepts by short_name or description"""
+    return db.query(Concept).filter(
+        and_(
+            Concept.retired == False,
+            (Concept.short_name.contains(name) | Concept.description.contains(name))
+        )
+    ).offset(skip).limit(limit).all()
+
+
+def get_active_concepts(db: Session, skip: int = 0, limit: int = 100) -> List[Concept]:
+    """Get only active (non-retired) concepts"""
+    return db.query(Concept).filter(
+        Concept.retired == False
+    ).offset(skip).limit(limit).all()
+
+
+def get_retired_concepts(db: Session, skip: int = 0, limit: int = 100) -> List[Concept]:
+    """Get only retired concepts"""
+    return db.query(Concept).filter(
+        Concept.retired == True
     ).offset(skip).limit(limit).all() 
