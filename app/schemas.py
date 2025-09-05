@@ -6,6 +6,7 @@ import re
 
 class OrderBase(BaseModel):
     """Base schema for order data"""
+
     order_type_id: Optional[int] = None
     concept_id: Optional[int] = None
     orderer: Optional[int] = None
@@ -38,11 +39,13 @@ class OrderBase(BaseModel):
 
 class OrderUpdate(OrderBase):
     """Schema for updating orders (PATCH)"""
+
     pass
 
 
 class OrderReplace(OrderBase):
     """Schema for replacing orders (PUT) - all fields required"""
+
     order_type_id: int
     concept_id: int
     orderer: int
@@ -55,17 +58,19 @@ class OrderReplace(OrderBase):
 
 class OrderResponse(OrderBase):
     """Schema for order responses"""
+
     order_id: int
     creator: int
     date_created: datetime
     uuid: str
-    
+
     class Config:
         from_attributes = True
 
 
 class OrderUpdateResponse(BaseModel):
     """Schema for update response"""
+
     success: bool
     message: str
     order_id: int
@@ -75,6 +80,7 @@ class OrderUpdateResponse(BaseModel):
 
 class ObsBase(BaseModel):
     """Base schema for observation data"""
+
     person_id: Optional[int] = None
     concept_id: Optional[int] = None
     encounter_id: Optional[int] = None
@@ -105,6 +111,7 @@ class ObsBase(BaseModel):
 
 class ObsCreate(ObsBase):
     """Schema for creating observations (POST) - required fields"""
+
     person_id: int
     concept_id: int
     encounter_id: int
@@ -133,11 +140,13 @@ class ObsCreate(ObsBase):
 
 class ObsUpdate(ObsBase):
     """Schema for updating observations (PATCH)"""
+
     pass
 
 
 class ObsReplace(ObsBase):
     """Schema for replacing observations (PUT) - all fields required"""
+
     person_id: int
     concept_id: int
     encounter_id: int
@@ -147,17 +156,19 @@ class ObsReplace(ObsBase):
 
 class ObsResponse(ObsBase):
     """Schema for observation responses"""
+
     obs_id: int
     creator: int
     date_created: datetime
     uuid: str
-    
+
     class Config:
         from_attributes = True
 
 
 class ObsUpdateResponse(BaseModel):
     """Schema for update response"""
+
     success: bool
     message: str
     obs_id: int
@@ -167,6 +178,7 @@ class ObsUpdateResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Schema for error responses"""
+
     success: bool = False
     error: str
     detail: Optional[str] = None
@@ -176,8 +188,10 @@ class ErrorResponse(BaseModel):
 # CONCEPT SCHEMAS
 # ============================================================================
 
+
 class ConceptBase(BaseModel):
     """Base schema for concept data"""
+
     short_name: Optional[str] = None
     description: Optional[str] = None
     form_text: Optional[str] = None
@@ -191,6 +205,7 @@ class ConceptBase(BaseModel):
 
 class ConceptCreate(ConceptBase):
     """Schema for creating concepts (POST) - required fields"""
+
     creator: int
     # Optional fields
     short_name: Optional[str] = None
@@ -204,11 +219,13 @@ class ConceptCreate(ConceptBase):
 
 class ConceptUpdate(ConceptBase):
     """Schema for updating concepts (PATCH)"""
+
     pass
 
 
 class ConceptReplace(ConceptBase):
     """Schema for replacing concepts (PUT) - all fields required"""
+
     creator: int
     short_name: str
     description: str
@@ -218,6 +235,7 @@ class ConceptReplace(ConceptBase):
 
 class ConceptResponse(ConceptBase):
     """Schema for concept responses"""
+
     concept_id: int
     creator: int
     date_created: datetime
@@ -226,15 +244,90 @@ class ConceptResponse(ConceptBase):
     date_changed: Optional[datetime] = None
     retired_by: Optional[int] = None
     date_retired: Optional[datetime] = None
-    
+
     class Config:
         from_attributes = True
 
 
 class ConceptUpdateResponse(BaseModel):
     """Schema for concept update response"""
+
     success: bool
     message: str
     concept_id: int
     updated_fields: list[str]
-    concept: Optional[ConceptResponse] = None 
+    concept: Optional[ConceptResponse] = None
+
+
+# ============================================================================
+# ENCOUNTER SCHEMAS
+# ============================================================================
+
+
+class EncounterBase(BaseModel):
+    """Base schema for encounter data"""
+
+    encounter_type: Optional[int] = None
+    patient_id: Optional[int] = None
+    location_id: Optional[int] = None
+    form_id: Optional[int] = None
+    encounter_datetime: Optional[datetime] = None
+    visit_id: Optional[int] = None
+    voided: Optional[bool] = None
+    void_reason: Optional[str] = None
+
+
+class EncounterCreate(EncounterBase):
+    """Schema for creating encounters (POST) - required fields"""
+
+    creator: int
+    encounter_type: int
+    patient_id: int
+    # Optional fields
+    location_id: Optional[int] = None
+    form_id: Optional[int] = None
+    encounter_datetime: Optional[datetime] = None
+    visit_id: Optional[int] = None
+
+
+class EncounterUpdate(EncounterBase):
+    """Schema for updating encounters (PATCH)"""
+
+    pass
+
+
+class EncounterReplace(EncounterBase):
+    """Schema for replacing encounters (PUT) - all fields required"""
+
+    creator: int
+    encounter_type: int
+    patient_id: int
+    location_id: int
+    form_id: int
+    visit_id: int
+
+
+class EncounterResponse(EncounterBase):
+    """Schema for encounter responses"""
+
+    encounter_id: int
+    creator: int
+    date_created: datetime
+    uuid: str
+    voided_by: Optional[int] = None
+    date_voided: Optional[datetime] = None
+    changed_by: Optional[int] = None
+    date_changed: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class EncounterUpdateResponse(BaseModel):
+    """Schema for encounter update response"""
+
+    success: bool
+    message: str
+    encounter_id: int
+    updated_fields: list[str]
+    encounter: Optional[EncounterResponse] = None

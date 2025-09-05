@@ -1,6 +1,4 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
-import os
 
 
 class Settings(BaseSettings):
@@ -10,20 +8,20 @@ class Settings(BaseSettings):
     db_name: str = "openmrs"
     db_user: str = "root"
     db_password: str = ""
-    
+
     # API settings
     api_keys: str = ""  # Comma-separated list of valid API keys
     port: int = 1221
     host: str = "0.0.0.0"
-    
+
     # Security settings
     secret_key: str = "your-secret-key-change-this-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
-    
+
     # Debug mode
     debug: bool = False
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -32,6 +30,7 @@ class Settings(BaseSettings):
 
 # Create settings instance
 settings = Settings()
+
 
 # Parse API keys from environment
 def get_valid_api_keys() -> list[str]:
@@ -44,4 +43,4 @@ def get_valid_api_keys() -> list[str]:
 # Database URL
 def get_database_url() -> str:
     """Generate database URL for SQLAlchemy"""
-    return f"mysql+pymysql://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}" 
+    return f"mysql+pymysql://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}"

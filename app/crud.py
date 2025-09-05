@@ -1,7 +1,24 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from app.models import Order, Obs, Concept
-from app.schemas import OrderUpdate, OrderReplace, ObsUpdate, ObsReplace, ObsCreate, ConceptUpdate, ConceptReplace, ConceptCreate
+from app.models import (
+    Order, 
+    Obs, 
+    Concept, 
+    Encounter
+)
+from app.schemas import (
+    OrderUpdate, 
+    OrderReplace, 
+    ObsUpdate, 
+    ObsReplace, 
+    ObsCreate, 
+    ConceptUpdate, 
+    ConceptReplace, 
+    ConceptCreate, 
+    EncounterUpdate, 
+    EncounterReplace, 
+    EncounterCreate
+)
 from typing import Optional, List
 from datetime import datetime
 
@@ -587,4 +604,252 @@ def get_retired_concepts(db: Session, skip: int = 0, limit: int = 100) -> List[C
     """Get only retired concepts"""
     return db.query(Concept).filter(
         Concept.retired == True
+    ).offset(skip).limit(limit).all()
+
+
+# ============================================================================
+# ENCOUNTER CRUD OPERATIONS
+# ============================================================================
+
+def create_encounter(db: Session, encounter_create: EncounterCreate) -> Encounter:
+    """Create a new encounter"""
+    # Generate UUID for new encounter
+    import uuid
+    encounter_uuid = str(uuid.uuid4())
+    
+    # Create encounter data
+    encounter_data = encounter_create.dict()
+    encounter_data['uuid'] = encounter_uuid
+    encounter_data['date_created'] = datetime.utcnow()
+    encounter_data['voided'] = False
+    
+    # Create new encounter
+    db_encounter = Encounter(**encounter_data)
+    
+    try:
+        db.add(db_encounter)
+        db.commit()
+        db.refresh(db_encounter)
+        return db_encounter
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def get_encounter(db: Session, encounter_id: int) -> Optional[Encounter]:
+    """Get encounter by ID"""
+    return db.query(Encounter).filter(Encounter.encounter_id == encounter_id).first()
+
+
+def get_encounter_by_uuid(db: Session, uuid: str) -> Optional[Encounter]:
+    """Get encounter by UUID"""
+    return db.query(Encounter).filter(Encounter.uuid == uuid).first()
+
+
+def update_encounter_partial(db: Session, encounter_id: int, encounter_update: EncounterUpdate) -> Optional[Encounter]:
+    """
+    Update encounter partially (PATCH) by ID
+    Only updates provided fields
+    """
+    db_encounter = get_encounter(db, encounter_id)
+    if not db_encounter:
+        return None
+    
+    # Get update data, excluding None values
+    update_data = encounter_update.dict(exclude_unset=True)
+    
+    if not update_data:
+        return db_encounter
+    
+    # Update fields
+    for field, value in update_data.items():
+        if hasattr(db_encounter, field):
+            setattr(db_encounter, field, value)
+    
+    # Set changed_by and date_changed if any field was updated
+    if update_data:
+        db_encounter.changed_by = update_data.get('changed_by', db_encounter.changed_by)
+        db_encounter.date_changed = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(db_encounter)
+        return db_encounter
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def update_encounter_partial_by_uuid(db: Session, uuid: str, encounter_update: EncounterUpdate) -> Optional[Encounter]:
+    """
+    Update encounter partially (PATCH) by UUID
+    Only updates provided fields
+    """
+    db_encounter = get_encounter_by_uuid(db, uuid)
+    if not db_encounter:
+        return None
+    
+    # Get update data, excluding None values
+    update_data = encounter_update.dict(exclude_unset=True)
+    
+    if not update_data:
+        return db_encounter
+    
+    # Update fields
+    for field, value in update_data.items():
+        if hasattr(db_encounter, field):
+            setattr(db_encounter, field, value)
+    
+    # Set changed_by and date_changed if any field was updated
+    if update_data:
+        db_encounter.changed_by = update_data.get('changed_by', db_encounter.changed_by)
+        db_encounter.date_changed = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(db_encounter)
+        return db_encounter
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def update_encounter_full(db: Session, encounter_id: int, encounter_replace: EncounterReplace) -> Optional[Encounter]:
+    """
+    Replace encounter completely (PUT) by ID
+    Updates all fields with provided values
+    """
+    db_encounter = get_encounter(db, encounter_id)
+    if not db_encounter:
+        return None
+    
+    # Get all data from the replace schema
+    replace_data = encounter_replace.dict()
+    
+    # Update all fields
+    for field, value in replace_data.items():
+        if hasattr(db_encounter, field):
+            setattr(db_encounter, field, value)
+    
+    # Set changed_by and date_changed
+    db_encounter.changed_by = replace_data.get('changed_by', db_encounter.changed_by)
+    db_encounter.date_changed = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(db_encounter)
+        return db_encounter
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def update_encounter_full_by_uuid(db: Session, uuid: str, encounter_replace: EncounterReplace) -> Optional[Encounter]:
+    """
+    Replace encounter completely (PUT) by UUID
+    Updates all fields with provided values
+    """
+    db_encounter = get_encounter_by_uuid(db, uuid)
+    if not db_encounter:
+        return None
+    
+    # Get all data from the replace schema
+    replace_data = encounter_replace.dict()
+    
+    # Update all fields
+    for field, value in replace_data.items():
+        if hasattr(db_encounter, field):
+            setattr(db_encounter, field, value)
+    
+    # Set changed_by and date_changed
+    db_encounter.changed_by = replace_data.get('changed_by', db_encounter.changed_by)
+    db_encounter.date_changed = datetime.utcnow()
+    
+    try:
+        db.commit()
+        db.refresh(db_encounter)
+        return db_encounter
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+def get_updated_encounter_fields(original_encounter: Encounter, updated_encounter: Encounter) -> List[str]:
+    """Get list of fields that were updated"""
+    updated_fields = []
+    
+    # Compare all fields
+    for field in Encounter.__table__.columns:
+        field_name = field.name
+        original_value = getattr(original_encounter, field_name)
+        updated_value = getattr(updated_encounter, field_name)
+        
+        if original_value != updated_value:
+            updated_fields.append(field_name)
+    
+    return updated_fields
+
+
+def list_encounters(db: Session, skip: int = 0, limit: int = 100) -> List[Encounter]:
+    """List encounters with pagination"""
+    return db.query(Encounter).offset(skip).limit(limit).all()
+
+
+def get_encounters_by_patient(db: Session, patient_id: int, skip: int = 0, limit: int = 100) -> List[Encounter]:
+    """Get encounters for a specific patient"""
+    return db.query(Encounter).filter(
+        and_(Encounter.patient_id == patient_id, Encounter.voided == False)
+    ).offset(skip).limit(limit).all()
+
+
+def get_encounters_by_type(db: Session, encounter_type: int, skip: int = 0, limit: int = 100) -> List[Encounter]:
+    """Get encounters for a specific encounter type"""
+    return db.query(Encounter).filter(
+        and_(Encounter.encounter_type == encounter_type, Encounter.voided == False)
+    ).offset(skip).limit(limit).all()
+
+
+def get_encounters_by_location(db: Session, location_id: int, skip: int = 0, limit: int = 100) -> List[Encounter]:
+    """Get encounters for a specific location"""
+    return db.query(Encounter).filter(
+        and_(Encounter.location_id == location_id, Encounter.voided == False)
+    ).offset(skip).limit(limit).all()
+
+
+def get_encounters_by_visit(db: Session, visit_id: int, skip: int = 0, limit: int = 100) -> List[Encounter]:
+    """Get encounters for a specific visit"""
+    return db.query(Encounter).filter(
+        and_(Encounter.visit_id == visit_id, Encounter.voided == False)
+    ).offset(skip).limit(limit).all()
+
+
+def get_encounters_by_creator(db: Session, creator: int, skip: int = 0, limit: int = 100) -> List[Encounter]:
+    """Get encounters created by a specific user"""
+    return db.query(Encounter).filter(
+        and_(Encounter.creator == creator, Encounter.voided == False)
+    ).offset(skip).limit(limit).all()
+
+
+def get_encounters_by_date_range(db: Session, start_date: datetime, end_date: datetime, skip: int = 0, limit: int = 100) -> List[Encounter]:
+    """Get encounters within a date range"""
+    return db.query(Encounter).filter(
+        and_(
+            Encounter.voided == False,
+            Encounter.encounter_datetime >= start_date,
+            Encounter.encounter_datetime <= end_date
+        )
+    ).offset(skip).limit(limit).all()
+
+
+def get_active_encounters(db: Session, skip: int = 0, limit: int = 100) -> List[Encounter]:
+    """Get only active (non-voided) encounters"""
+    return db.query(Encounter).filter(
+        Encounter.voided == False
+    ).offset(skip).limit(limit).all()
+
+
+def get_voided_encounters(db: Session, skip: int = 0, limit: int = 100) -> List[Encounter]:
+    """Get only voided encounters"""
+    return db.query(Encounter).filter(
+        Encounter.voided == True
     ).offset(skip).limit(limit).all() 

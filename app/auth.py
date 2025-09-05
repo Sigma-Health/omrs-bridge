@@ -1,9 +1,10 @@
+import hashlib
+import secrets
+
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 from app.config import get_valid_api_keys
-import secrets
-import hashlib
-import time
 
 
 # Security scheme for API key authentication
@@ -21,23 +22,23 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)
             detail="API key required",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     api_key = credentials.credentials
     valid_keys = get_valid_api_keys()
-    
+
     if not valid_keys:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="No API keys configured"
+            detail="No API keys configured",
         )
-    
+
     if api_key not in valid_keys:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     return api_key
 
 
@@ -60,4 +61,4 @@ def hash_api_key(api_key: str) -> str:
 
 # Dependency for protected endpoints
 def get_current_api_key(api_key: str = Depends(verify_api_key)):
-    return api_key 
+    return api_key
