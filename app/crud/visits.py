@@ -258,12 +258,14 @@ class VisitsCRUD(BaseCRUD[Visit]):
         Returns:
             List of visits that have orders of the specified type
         """
-        from app.models import Order
+        from app.models import Order, Encounter
 
-        # Join visits with orders to find visits that have orders of the specified type
+        # Join visits with encounters and orders to find visits that have orders of the specified type
+        # Relationship: Visit -> Encounter -> Order
         query = (
             db.query(self.model)
-            .join(Order, self.model.visit_id == Order.visit_id)
+            .join(Encounter, self.model.visit_id == Encounter.visit_id)
+            .join(Order, Encounter.encounter_id == Order.encounter_id)
             .filter(Order.order_type_id == order_type_id)
         )
 
