@@ -4,7 +4,7 @@ from sqlalchemy import and_
 from datetime import datetime
 
 from .base import BaseCRUD
-from app.models import Order, Person, PersonName
+from app.models import Order
 
 
 class OrdersCRUD(BaseCRUD[Order]):
@@ -532,6 +532,8 @@ class OrdersCRUD(BaseCRUD[Order]):
         Returns:
             Dictionary with person information or None if not found
         """
+        from app.models import Person, PersonName
+
         # Get person record
         person = db.query(Person).filter(Person.person_id == person_id).first()
         if not person:
