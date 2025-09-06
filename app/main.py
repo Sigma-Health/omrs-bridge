@@ -8,6 +8,8 @@ from app.api.orders import router as orders_router
 from app.api.observations import router as observations_router
 from app.api.concepts import router as concepts_router
 from app.api.encounters import router as encounters_router
+from app.api.order_types import router as order_types_router
+from app.api.visits import router as visits_router
 from app.config import settings
 from app.auth import generate_api_key
 
@@ -93,6 +95,16 @@ app.include_router(
     encounters_router,
     prefix="/api/v1/encounters",
     tags=["encounters"],
+)
+app.include_router(
+    order_types_router,
+    prefix="/api/v1/order-types",
+    tags=["order-types"],
+)
+app.include_router(
+    visits_router,
+    prefix="/api/v1/visits",
+    tags=["visits"],
 )
 
 
