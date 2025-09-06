@@ -34,6 +34,7 @@ from .order import (
     OrderReplace,
     OrderResponse,
     OrderUpdateResponse,
+    PersonInfo,
 )
 from .order_type import (
     OrderTypeBase,
@@ -82,6 +83,7 @@ __all__ = [
     "OrderReplace",
     "OrderResponse",
     "OrderUpdateResponse",
+    "PersonInfo",
     # Order Type
     "OrderTypeBase",
     "OrderTypeCreate",

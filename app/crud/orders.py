@@ -1,11 +1,10 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from datetime import datetime
 
 from .base import BaseCRUD
-from app.models import Order
-from app.schemas import OrderUpdate, OrderReplace
+from app.models import Order, Person, PersonName
 
 
 class OrdersCRUD(BaseCRUD[Order]):
@@ -63,7 +62,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.patient_id == patient_id, Order.voided == False))
+            .filter(and_(Order.patient_id == patient_id, not Order.voided))
             .offset(skip)
             .limit(limit)
             .all()
@@ -86,7 +85,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.urgency == urgency, Order.voided == False))
+            .filter(and_(Order.urgency == urgency, not Order.voided))
             .offset(skip)
             .limit(limit)
             .all()
@@ -109,7 +108,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.orderer == orderer, Order.voided == False))
+            .filter(and_(Order.orderer == orderer, not Order.voided))
             .offset(skip)
             .limit(limit)
             .all()
@@ -132,7 +131,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.encounter_id == encounter_id, Order.voided == False))
+            .filter(and_(Order.encounter_id == encounter_id, not Order.voided))
             .offset(skip)
             .limit(limit)
             .all()
@@ -155,7 +154,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.concept_id == concept_id, Order.voided == False))
+            .filter(and_(Order.concept_id == concept_id, not Order.voided))
             .offset(skip)
             .limit(limit)
             .all()
@@ -178,7 +177,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.order_type_id == order_type_id, Order.voided == False))
+            .filter(and_(Order.order_type_id == order_type_id, not Order.voided))
             .offset(skip)
             .limit(limit)
             .all()
@@ -198,13 +197,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         Returns:
             List of active orders
         """
-        return (
-            db.query(Order)
-            .filter(Order.voided == False)
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+        return db.query(Order).filter(not Order.voided).offset(skip).limit(limit).all()
 
     def get_voided_orders(
         self, db: Session, skip: int = 0, limit: int = 100
@@ -220,9 +213,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         Returns:
             List of voided orders
         """
-        return (
-            db.query(Order).filter(Order.voided == True).offset(skip).limit(limit).all()
-        )
+        return db.query(Order).filter(Order.voided).offset(skip).limit(limit).all()
 
     def void_order(
         self, db: Session, order_id: int, voided_by: int, reason: str = None
@@ -305,7 +296,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.fulfiller_status == status, Order.voided == False))
+            .filter(and_(Order.fulfiller_status == status, not Order.voided))
             .offset(skip)
             .limit(limit)
             .all()
@@ -328,7 +319,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.order_action == action, Order.voided == False))
+            .filter(and_(Order.order_action == action, not Order.voided))
             .offset(skip)
             .limit(limit)
             .all()
@@ -365,7 +356,7 @@ class OrdersCRUD(BaseCRUD[Order]):
                 and_(
                     Order.order_type_id == order_type_id,
                     Visit.visit_id == visit_id,
-                    Order.voided == False,
+                    not Order.voided,
                 )
             )
             .offset(skip)
@@ -404,7 +395,7 @@ class OrdersCRUD(BaseCRUD[Order]):
                 and_(
                     Order.order_type_id == order_type_id,
                     Visit.uuid == visit_uuid,
-                    Order.voided == False,
+                    not Order.voided,
                 )
             )
             .offset(skip)
@@ -433,7 +424,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             db.query(Order)
             .join(Encounter, Order.encounter_id == Encounter.encounter_id)
             .join(Visit, Encounter.visit_id == Visit.visit_id)
-            .filter(and_(Visit.visit_id == visit_id, Order.voided == False))
+            .filter(and_(Visit.visit_id == visit_id, not Order.voided))
             .offset(skip)
             .limit(limit)
             .all()
@@ -460,11 +451,130 @@ class OrdersCRUD(BaseCRUD[Order]):
             db.query(Order)
             .join(Encounter, Order.encounter_id == Encounter.encounter_id)
             .join(Visit, Encounter.visit_id == Visit.visit_id)
-            .filter(and_(Visit.uuid == visit_uuid, Order.voided == False))
+            .filter(and_(Visit.uuid == visit_uuid, not Order.voided))
             .offset(skip)
             .limit(limit)
             .all()
         )
+
+    def get_order_with_person_info(
+        self, db: Session, order_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get order with enriched creator and patient information including names and UUIDs.
+
+        Args:
+            db: Database session
+            order_id: Order ID to retrieve
+
+        Returns:
+            Dictionary with order data and enriched person information
+        """
+        # Get the order
+        order = db.query(Order).filter(Order.order_id == order_id).first()
+        if not order:
+            return None
+
+        # Get creator information
+        creator_info = self._get_person_info(db, order.creator)
+
+        # Get patient information
+        patient_info = self._get_person_info(db, order.patient_id)
+
+        # Convert order to dict and add enriched information
+        order_dict = {
+            "order_id": order.order_id,
+            "order_type_id": order.order_type_id,
+            "concept_id": order.concept_id,
+            "orderer": order.orderer,
+            "encounter_id": order.encounter_id,
+            "instructions": order.instructions,
+            "date_activated": order.date_activated,
+            "auto_expire_date": order.auto_expire_date,
+            "date_stopped": order.date_stopped,
+            "order_reason": order.order_reason,
+            "order_reason_non_coded": order.order_reason_non_coded,
+            "voided": order.voided,
+            "voided_by": order.voided_by,
+            "date_voided": order.date_voided,
+            "void_reason": order.void_reason,
+            "patient_id": order.patient_id,
+            "accession_number": order.accession_number,
+            "urgency": order.urgency,
+            "order_number": order.order_number,
+            "previous_order_id": order.previous_order_id,
+            "order_action": order.order_action,
+            "comment_to_fulfiller": order.comment_to_fulfiller,
+            "care_setting": order.care_setting,
+            "scheduled_date": order.scheduled_date,
+            "order_group_id": order.order_group_id,
+            "sort_weight": order.sort_weight,
+            "fulfiller_comment": order.fulfiller_comment,
+            "fulfiller_status": order.fulfiller_status,
+            "form_namespace_and_path": order.form_namespace_and_path,
+            "creator": order.creator,
+            "date_created": order.date_created,
+            "uuid": order.uuid,
+            "creator_info": creator_info,
+            "patient_info": patient_info,
+        }
+
+        return order_dict
+
+    def _get_person_info(self, db: Session, person_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get person information including name and UUID.
+
+        Args:
+            db: Database session
+            person_id: Person ID to retrieve information for
+
+        Returns:
+            Dictionary with person information or None if not found
+        """
+        # Get person record
+        person = db.query(Person).filter(Person.person_id == person_id).first()
+        if not person:
+            return None
+
+        # Get preferred name
+        preferred_name = (
+            db.query(PersonName)
+            .filter(
+                and_(
+                    PersonName.person_id == person_id,
+                    PersonName.preferred,
+                    not PersonName.voided,
+                )
+            )
+            .first()
+        )
+
+        # Build name string
+        name_parts = []
+        if preferred_name:
+            if preferred_name.prefix:
+                name_parts.append(preferred_name.prefix)
+            if preferred_name.given_name:
+                name_parts.append(preferred_name.given_name)
+            if preferred_name.middle_name:
+                name_parts.append(preferred_name.middle_name)
+            if preferred_name.family_name:
+                name_parts.append(preferred_name.family_name)
+            if preferred_name.family_name2:
+                name_parts.append(preferred_name.family_name2)
+            if preferred_name.family_name_suffix:
+                name_parts.append(preferred_name.family_name_suffix)
+
+        full_name = " ".join(name_parts) if name_parts else None
+
+        return {
+            "person_id": person.person_id,
+            "uuid": person.uuid,
+            "name": full_name,
+            "gender": person.gender,
+            "birthdate": person.birthdate,
+        }
 
 
 # Create instance

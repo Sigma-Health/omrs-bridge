@@ -7,6 +7,16 @@ from typing import Optional
 from datetime import datetime
 
 
+class PersonInfo(BaseModel):
+    """Schema for person information (creator/patient)"""
+
+    person_id: int
+    uuid: str
+    name: Optional[str] = None
+    gender: Optional[str] = None
+    birthdate: Optional[datetime] = None
+
+
 class OrderBase(BaseModel):
     """Base schema for order data"""
 
@@ -66,6 +76,8 @@ class OrderResponse(OrderBase):
     creator: int
     date_created: datetime
     uuid: str
+    creator_info: Optional[PersonInfo] = None
+    patient_info: Optional[PersonInfo] = None
 
     class Config:
         from_attributes = True

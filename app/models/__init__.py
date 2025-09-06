@@ -9,6 +9,8 @@ from .encounter import Encounter
 from .obs import Obs
 from .order import Order
 from .order_type import OrderType
+from .patient import Patient
+from .person import Person, PersonName
 from .visit import Visit
 
 __all__ = [
@@ -18,5 +20,8 @@ __all__ = [
     "Obs",
     "Order",
     "OrderType",
+    "Patient",
+    "Person",
+    "PersonName",
     "Visit",
 ]

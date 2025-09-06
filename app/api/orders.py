@@ -386,6 +386,22 @@ async def get_order(
     return order
 
 
+@router.get("/{order_id}/enriched")
+async def get_order_enriched(
+    order_id: int = Path(..., description="Order ID"),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Get order by ID with enriched creator and patient information.
+    This endpoint includes the names and UUIDs of both the creator and patient.
+    """
+    order_data = orders.get_order_with_person_info(db, order_id)
+    if not order_data:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return order_data
+
+
 @router.get("/uuid/{uuid}", response_model=OrderResponse)
 async def get_order_by_uuid(
     uuid: str,
