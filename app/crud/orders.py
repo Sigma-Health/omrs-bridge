@@ -627,10 +627,12 @@ class OrdersCRUD(BaseCRUD[Order]):
             logger.info(f"Raw SQL row: {dict(row._mapping)}")
 
         # Get all names for this person (not just preferred)
+        # Note: Using PersonName.voided == False instead of not PersonName.voided
+        # because SQLAlchemy translates 'not PersonName.voided' to 'false = 1' in some DB configs
         query = db.query(PersonName).filter(
             and_(
                 PersonName.person_id == person_id,
-                not PersonName.voided,
+                PersonName.voided == False,  # noqa: E712
             )
         )
         logger.info(f"SQLAlchemy query: {query}")
@@ -642,35 +644,18 @@ class OrdersCRUD(BaseCRUD[Order]):
                 f"Name: ID={name.person_name_id}, preferred={name.preferred} (type: {type(name.preferred)}), given={name.given_name}, family={name.family_name}"
             )
 
-        # Get preferred name - try different approaches
+        # Get preferred name
         preferred_name = (
             db.query(PersonName)
             .filter(
                 and_(
                     PersonName.person_id == person_id,
                     PersonName.preferred == True,  # noqa: E712
-                    not PersonName.voided,
+                    PersonName.voided == False,  # noqa: E712
                 )
             )
             .first()
         )
-
-        if not preferred_name:
-            # Try with integer comparison
-            preferred_name = (
-                db.query(PersonName)
-                .filter(
-                    and_(
-                        PersonName.person_id == person_id,
-                        PersonName.preferred == 1,
-                        not PersonName.voided,
-                    )
-                )
-                .first()
-            )
-            logger.info(
-                f"Tried integer comparison for preferred name, found: {preferred_name is not None}"
-            )
 
         if not preferred_name and all_names:
             # If no preferred name, use the first non-voided name
