@@ -67,7 +67,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.patient_id == patient_id, not Order.voided))
+            .filter(and_(Order.patient_id == patient_id, Order.voided == False))  # noqa: E712
             .offset(skip)
             .limit(limit)
             .all()
@@ -90,7 +90,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.urgency == urgency, not Order.voided))
+            .filter(and_(Order.urgency == urgency, Order.voided == False))  # noqa: E712
             .offset(skip)
             .limit(limit)
             .all()
@@ -113,7 +113,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.orderer == orderer, not Order.voided))
+            .filter(and_(Order.orderer == orderer, Order.voided == False))  # noqa: E712
             .offset(skip)
             .limit(limit)
             .all()
@@ -136,7 +136,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.encounter_id == encounter_id, not Order.voided))
+            .filter(and_(Order.encounter_id == encounter_id, Order.voided == False))  # noqa: E712
             .offset(skip)
             .limit(limit)
             .all()
@@ -159,7 +159,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.concept_id == concept_id, not Order.voided))
+            .filter(and_(Order.concept_id == concept_id, Order.voided == False))  # noqa: E712
             .offset(skip)
             .limit(limit)
             .all()
@@ -182,7 +182,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.order_type_id == order_type_id, not Order.voided))
+            .filter(and_(Order.order_type_id == order_type_id, Order.voided == False))  # noqa: E712
             .offset(skip)
             .limit(limit)
             .all()
@@ -202,7 +202,13 @@ class OrdersCRUD(BaseCRUD[Order]):
         Returns:
             List of active orders
         """
-        return db.query(Order).filter(not Order.voided).offset(skip).limit(limit).all()
+        return (
+            db.query(Order)
+            .filter(Order.voided == False)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )  # noqa: E712
 
     def get_voided_orders(
         self, db: Session, skip: int = 0, limit: int = 100
@@ -301,7 +307,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.fulfiller_status == status, not Order.voided))
+            .filter(and_(Order.fulfiller_status == status, Order.voided == False))  # noqa: E712
             .offset(skip)
             .limit(limit)
             .all()
@@ -324,7 +330,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(and_(Order.order_action == action, not Order.voided))
+            .filter(and_(Order.order_action == action, Order.voided == False))  # noqa: E712
             .offset(skip)
             .limit(limit)
             .all()
@@ -361,7 +367,7 @@ class OrdersCRUD(BaseCRUD[Order]):
                 and_(
                     Order.order_type_id == order_type_id,
                     Visit.visit_id == visit_id,
-                    not Order.voided,
+                    Order.voided == False,  # noqa: E712
                 )
             )
             .offset(skip)
@@ -400,7 +406,7 @@ class OrdersCRUD(BaseCRUD[Order]):
                 and_(
                     Order.order_type_id == order_type_id,
                     Visit.uuid == visit_uuid,
-                    not Order.voided,
+                    Order.voided == False,  # noqa: E712
                 )
             )
             .offset(skip)
@@ -429,7 +435,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             db.query(Order)
             .join(Encounter, Order.encounter_id == Encounter.encounter_id)
             .join(Visit, Encounter.visit_id == Visit.visit_id)
-            .filter(and_(Visit.visit_id == visit_id, not Order.voided))
+            .filter(and_(Visit.visit_id == visit_id, Order.voided == False))  # noqa: E712
             .offset(skip)
             .limit(limit)
             .all()
@@ -498,11 +504,13 @@ class OrdersCRUD(BaseCRUD[Order]):
                 return []
 
             # Now run the actual query
+            # Note: Using Order.voided == False instead of not Order.voided
+            # because SQLAlchemy translates 'not Order.voided' to 'false = 1' in some DB configs
             query = (
                 db.query(Order)
                 .join(Encounter, Order.encounter_id == Encounter.encounter_id)
                 .join(Visit, Encounter.visit_id == Visit.visit_id)
-                .filter(and_(Visit.uuid == visit_uuid, not Order.voided))
+                .filter(and_(Visit.uuid == visit_uuid, Order.voided == False))  # noqa: E712
             )
 
             # Log the SQL query
