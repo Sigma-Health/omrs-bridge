@@ -204,11 +204,11 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return (
             db.query(Order)
-            .filter(Order.voided == False)
+            .filter(Order.voided == False)  # noqa: E712
             .offset(skip)
             .limit(limit)
             .all()
-        )  # noqa: E712
+        )
 
     def get_voided_orders(
         self, db: Session, skip: int = 0, limit: int = 100
@@ -603,10 +603,35 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         from app.models import Person, PersonName
 
+        logger.info(f"Getting person info for person_id: {person_id}")
+
         # Get person record
         person = db.query(Person).filter(Person.person_id == person_id).first()
         if not person:
+            logger.warning(f"Person with ID {person_id} not found")
             return None
+
+        logger.info(
+            f"Found person: ID={person.person_id}, UUID={person.uuid}, gender={person.gender}"
+        )
+
+        # Get all names for this person (not just preferred)
+        all_names = (
+            db.query(PersonName)
+            .filter(
+                and_(
+                    PersonName.person_id == person_id,
+                    not PersonName.voided,
+                )
+            )
+            .all()
+        )
+
+        logger.info(f"Found {len(all_names)} names for person {person_id}")
+        for name in all_names:
+            logger.info(
+                f"Name: ID={name.person_name_id}, preferred={name.preferred}, given={name.given_name}, family={name.family_name}"
+            )
 
         # Get preferred name
         preferred_name = (
@@ -620,6 +645,13 @@ class OrdersCRUD(BaseCRUD[Order]):
             )
             .first()
         )
+
+        if not preferred_name and all_names:
+            # If no preferred name, use the first non-voided name
+            preferred_name = all_names[0]
+            logger.info(
+                f"No preferred name found, using first name: {preferred_name.given_name} {preferred_name.family_name}"
+            )
 
         # Build name string
         name_parts = []
@@ -638,6 +670,7 @@ class OrdersCRUD(BaseCRUD[Order]):
                 name_parts.append(preferred_name.family_name_suffix)
 
         full_name = " ".join(name_parts) if name_parts else None
+        logger.info(f"Built full name: '{full_name}'")
 
         return {
             "person_id": person.person_id,
@@ -646,6 +679,108 @@ class OrdersCRUD(BaseCRUD[Order]):
             "gender": person.gender,
             "birthdate": person.birthdate,
         }
+
+    def get_orders_by_visit_uuid_with_person_info(
+        self, db: Session, visit_uuid: str, skip: int = 0, limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all orders for a visit by visit UUID with enriched creator and patient information.
+
+        Args:
+            db: Database session
+            visit_uuid: Visit UUID to filter by
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List of orders with enriched person information
+        """
+        from app.models import Encounter, Visit
+
+        logger.info(f"Getting orders with person info for visit UUID: {visit_uuid}")
+
+        try:
+            # First, let's check if the visit exists
+            visit = db.query(Visit).filter(Visit.uuid == visit_uuid).first()
+            if not visit:
+                logger.warning(f"Visit with UUID {visit_uuid} not found")
+                return []
+
+            logger.info(
+                f"Found visit: ID={visit.visit_id}, patient_id={visit.patient_id}"
+            )
+
+            # Get orders using the same logic as the regular method
+            query = (
+                db.query(Order)
+                .join(Encounter, Order.encounter_id == Encounter.encounter_id)
+                .join(Visit, Encounter.visit_id == Visit.visit_id)
+                .filter(and_(Visit.uuid == visit_uuid, Order.voided == False))  # noqa: E712
+            )
+
+            orders_list = query.offset(skip).limit(limit).all()
+            logger.info(
+                f"Found {len(orders_list)} orders, now enriching with person info"
+            )
+
+            # Enrich each order with person information
+            enriched_orders = []
+            for order in orders_list:
+                # Get creator information
+                creator_info = self._get_person_info(db, order.creator)
+
+                # Get patient information
+                patient_info = self._get_person_info(db, order.patient_id)
+
+                # Convert order to dict and add enriched information
+                order_dict = {
+                    "order_id": order.order_id,
+                    "order_type_id": order.order_type_id,
+                    "concept_id": order.concept_id,
+                    "orderer": order.orderer,
+                    "encounter_id": order.encounter_id,
+                    "instructions": order.instructions,
+                    "date_activated": order.date_activated,
+                    "auto_expire_date": order.auto_expire_date,
+                    "date_stopped": order.date_stopped,
+                    "order_reason": order.order_reason,
+                    "order_reason_non_coded": order.order_reason_non_coded,
+                    "voided": order.voided,
+                    "voided_by": order.voided_by,
+                    "date_voided": order.date_voided,
+                    "void_reason": order.void_reason,
+                    "patient_id": order.patient_id,
+                    "accession_number": order.accession_number,
+                    "urgency": order.urgency,
+                    "order_number": order.order_number,
+                    "previous_order_id": order.previous_order_id,
+                    "order_action": order.order_action,
+                    "comment_to_fulfiller": order.comment_to_fulfiller,
+                    "care_setting": order.care_setting,
+                    "scheduled_date": order.scheduled_date,
+                    "order_group_id": order.order_group_id,
+                    "sort_weight": order.sort_weight,
+                    "fulfiller_comment": order.fulfiller_comment,
+                    "fulfiller_status": order.fulfiller_status,
+                    "form_namespace_and_path": order.form_namespace_and_path,
+                    "creator": order.creator,
+                    "date_created": order.date_created,
+                    "uuid": order.uuid,
+                    "creator_info": creator_info,
+                    "patient_info": patient_info,
+                }
+
+                enriched_orders.append(order_dict)
+
+            logger.info(f"Returning {len(enriched_orders)} enriched orders")
+            return enriched_orders
+
+        except Exception as e:
+            logger.error(
+                f"Error getting orders with person info for visit UUID {visit_uuid}: {str(e)}"
+            )
+            logger.exception("Full traceback:")
+            raise
 
 
 # Create instance
