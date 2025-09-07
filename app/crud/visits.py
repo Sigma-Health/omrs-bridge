@@ -3,7 +3,7 @@ Visit-specific CRUD operations.
 Extends BaseCRUD with visit-specific functionality.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
@@ -292,6 +292,158 @@ class VisitsCRUD(BaseCRUD[Visit]):
             .limit(limit)
             .all()
         )
+
+    def get_visits_with_order_type_and_patient_info(
+        self,
+        db: Session,
+        order_type_id: int,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        patient_id: Optional[int] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get visits that have orders of a particular order type with enriched patient information.
+        Uses joins to avoid N+1 queries for optimal performance.
+
+        Args:
+            db: Database session
+            order_type_id: Order type ID to filter by
+            start_date: Optional start date (YYYY-MM-DD format)
+            end_date: Optional end date (YYYY-MM-DD format)
+            patient_id: Optional patient ID to filter by
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List of visits with enriched patient information
+        """
+        from app.models import Order, Encounter, Person, PersonName
+        from sqlalchemy.orm import aliased
+
+        # Create aliases for Person and PersonName tables
+        PatientPerson = aliased(Person)
+        PatientPersonName = aliased(PersonName)
+
+        # Use a single query with joins to get all data efficiently
+        query = (
+            db.query(
+                self.model,
+                # Patient information
+                PatientPerson.person_id.label("patient_person_id"),
+                PatientPerson.uuid.label("patient_uuid"),
+                PatientPerson.gender.label("patient_gender"),
+                PatientPerson.birthdate.label("patient_birthdate"),
+                # Patient name
+                PatientPersonName.given_name.label("patient_given_name"),
+                PatientPersonName.family_name.label("patient_family_name"),
+                PatientPersonName.prefix.label("patient_prefix"),
+                PatientPersonName.middle_name.label("patient_middle_name"),
+                PatientPersonName.family_name2.label("patient_family_name2"),
+                PatientPersonName.family_name_suffix.label(
+                    "patient_family_name_suffix"
+                ),
+            )
+            .join(Encounter, self.model.visit_id == Encounter.visit_id)
+            .join(Order, Encounter.encounter_id == Order.encounter_id)
+            # Join for patient information
+            .outerjoin(
+                PatientPerson,
+                and_(
+                    PatientPerson.person_id == self.model.patient_id,
+                    PatientPerson.voided == False,  # noqa: E712
+                ),
+            )
+            .outerjoin(
+                PatientPersonName,
+                and_(
+                    PatientPersonName.person_id == self.model.patient_id,
+                    PatientPersonName.preferred == True,  # noqa: E712
+                    PatientPersonName.voided == False,  # noqa: E712
+                ),
+            )
+            .filter(Order.order_type_id == order_type_id)
+        )
+
+        # Apply date range filter if provided
+        if start_date and end_date:
+            query = query.filter(
+                and_(
+                    self.model.date_started >= start_date,
+                    self.model.date_started <= end_date,
+                )
+            )
+        elif start_date:
+            query = query.filter(self.model.date_started >= start_date)
+        elif end_date:
+            query = query.filter(self.model.date_started <= end_date)
+
+        # Apply patient filter if provided
+        if patient_id:
+            query = query.filter(self.model.patient_id == patient_id)
+
+        results = (
+            query.order_by(self.model.date_started.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+        # Transform results into enriched visit dictionaries
+        enriched_visits = []
+        for row in results:
+            visit = row[0]  # The Visit object is first in the tuple
+
+            # Build patient name
+            patient_name_parts = []
+            if row.patient_prefix:
+                patient_name_parts.append(row.patient_prefix)
+            if row.patient_given_name:
+                patient_name_parts.append(row.patient_given_name)
+            if row.patient_middle_name:
+                patient_name_parts.append(row.patient_middle_name)
+            if row.patient_family_name:
+                patient_name_parts.append(row.patient_family_name)
+            if row.patient_family_name2:
+                patient_name_parts.append(row.patient_family_name2)
+            if row.patient_family_name_suffix:
+                patient_name_parts.append(row.patient_family_name_suffix)
+            patient_name = " ".join(patient_name_parts) if patient_name_parts else None
+
+            # Create enriched visit dictionary
+            visit_dict = {
+                "visit_id": visit.visit_id,
+                "patient_id": visit.patient_id,
+                "visit_type_id": visit.visit_type_id,
+                "date_started": visit.date_started,
+                "date_stopped": visit.date_stopped,
+                "indication_concept_id": visit.indication_concept_id,
+                "location_id": visit.location_id,
+                "creator": visit.creator,
+                "date_created": visit.date_created,
+                "changed_by": visit.changed_by,
+                "date_changed": visit.date_changed,
+                "voided": visit.voided,
+                "voided_by": visit.voided_by,
+                "date_voided": visit.date_voided,
+                "void_reason": visit.void_reason,
+                "uuid": visit.uuid,
+                # Enriched patient information
+                "patient_info": {
+                    "person_id": row.patient_person_id,
+                    "uuid": row.patient_uuid,
+                    "name": patient_name,
+                    "gender": row.patient_gender,
+                    "birthdate": row.patient_birthdate,
+                }
+                if row.patient_person_id
+                else None,
+            }
+
+            enriched_visits.append(visit_dict)
+
+        return enriched_visits
 
     def stop_visit(
         self,

@@ -52,6 +52,7 @@ from .visit import (
     VisitReplace,
     VisitResponse,
     VisitUpdateResponse,
+    PersonInfo as VisitPersonInfo,
 )
 
 __all__ = [
@@ -100,4 +101,5 @@ __all__ = [
     "VisitReplace",
     "VisitResponse",
     "VisitUpdateResponse",
+    "VisitPersonInfo",
 ]

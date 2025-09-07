@@ -7,6 +7,16 @@ from typing import Optional
 from datetime import datetime
 
 
+class PersonInfo(BaseModel):
+    """Schema for person information (patient)"""
+
+    person_id: int
+    uuid: str
+    name: Optional[str] = None
+    gender: Optional[str] = None
+    birthdate: Optional[datetime] = None
+
+
 class VisitBase(BaseModel):
     """Base schema for visit data"""
 
@@ -60,6 +70,7 @@ class VisitResponse(VisitBase):
     uuid: str
     changed_by: Optional[int] = None
     date_changed: Optional[datetime] = None
+    patient_info: Optional[PersonInfo] = None
 
     class Config:
         from_attributes = True

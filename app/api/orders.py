@@ -405,55 +405,6 @@ async def get_order_enriched(
     return order_data
 
 
-@router.get("/visit/uuid/{visit_uuid}/enriched")
-async def get_orders_by_visit_uuid_enriched(
-    visit_uuid: str = Path(..., description="Visit UUID"),
-    skip: int = Query(
-        0,
-        ge=0,
-        description="Number of records to skip",
-    ),
-    limit: int = Query(
-        100,
-        ge=1,
-        le=1000,
-        description="Number of records to return",
-    ),
-    db: Session = Depends(get_db),
-    api_key: str = Depends(get_current_api_key),
-):
-    """
-    Get all orders for a particular visit (by visit UUID) with enriched creator and patient information.
-    This endpoint includes the names and UUIDs of both the creator and patient.
-    """
-    try:
-        # Validate UUID format
-        if not validate_uuid(visit_uuid):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid visit UUID format",
-            )
-
-        orders_list = orders.get_orders_by_visit_uuid_with_person_info(
-            db,
-            visit_uuid=visit_uuid,
-            skip=skip,
-            limit=limit,
-        )
-
-        return orders_list
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            f"Error getting enriched orders for visit UUID {visit_uuid}: {str(e)}"
-        )
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to get orders: {str(e)}",
-        )
-
-
 @router.get("/uuid/{uuid}", response_model=OrderResponse)
 async def get_order_by_uuid(
     uuid: str,
@@ -793,7 +744,7 @@ async def get_orders_by_type_and_visit_uuid(
                 detail="Invalid visit UUID format",
             )
 
-        return orders.get_orders_by_type_and_visit_uuid_with_person_info(
+        return orders.get_orders_by_type_and_visit_uuid(
             db,
             order_type_id=order_type_id,
             visit_uuid=visit_uuid,
