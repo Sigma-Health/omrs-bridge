@@ -435,7 +435,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         Returns:
             List of orders
         """
-        from app.models import Encounter, Visit, Person, PersonName
+        from app.models import Encounter, Visit, Person, PersonName, Provider
         from sqlalchemy.orm import aliased
 
         # Create aliases for Person and PersonName tables to join them multiple times
@@ -447,6 +447,11 @@ class OrdersCRUD(BaseCRUD[Order]):
         query = (
             db.query(
                 Order,
+                # Provider information
+                Provider.provider_id.label("provider_id"),
+                Provider.name.label("provider_name"),
+                Provider.identifier.label("provider_identifier"),
+                Provider.uuid.label("provider_uuid"),
                 # Orderer information
                 OrdererPerson.person_id.label("orderer_person_id"),
                 OrdererPerson.uuid.label("orderer_uuid"),
@@ -478,18 +483,25 @@ class OrdersCRUD(BaseCRUD[Order]):
             )
             .join(Encounter, Order.encounter_id == Encounter.encounter_id)
             .join(Visit, Encounter.visit_id == Visit.visit_id)
-            # Join for orderer information
+            # Join for orderer information through provider table
+            .outerjoin(
+                Provider,
+                and_(
+                    Provider.provider_id == Order.orderer,
+                    Provider.retired == False,  # noqa: E712
+                ),
+            )
             .outerjoin(
                 OrdererPerson,
                 and_(
-                    OrdererPerson.person_id == Order.orderer,
+                    OrdererPerson.person_id == Provider.person_id,
                     OrdererPerson.voided == False,  # noqa: E712
                 ),
             )
             .outerjoin(
                 OrdererPersonName,
                 and_(
-                    OrdererPersonName.person_id == Order.orderer,
+                    OrdererPersonName.person_id == Provider.person_id,
                     OrdererPersonName.preferred == True,  # noqa: E712
                     OrdererPersonName.voided == False,  # noqa: E712
                 ),
@@ -528,7 +540,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         for row in results:
             order = row[0]  # The Order object is first in the tuple
 
-            # Build orderer name
+            # Build orderer name - prefer person name, fallback to provider name
             orderer_name_parts = []
             if row.orderer_prefix:
                 orderer_name_parts.append(row.orderer_prefix)
@@ -542,7 +554,14 @@ class OrdersCRUD(BaseCRUD[Order]):
                 orderer_name_parts.append(row.orderer_family_name2)
             if row.orderer_family_name_suffix:
                 orderer_name_parts.append(row.orderer_family_name_suffix)
-            orderer_name = " ".join(orderer_name_parts) if orderer_name_parts else None
+
+            # Use person name if available, otherwise use provider name
+            if orderer_name_parts:
+                orderer_name = " ".join(orderer_name_parts)
+            elif row.provider_name:
+                orderer_name = row.provider_name
+            else:
+                orderer_name = None
 
             # Build patient name
             patient_name_parts = []
@@ -596,13 +615,17 @@ class OrdersCRUD(BaseCRUD[Order]):
                 "uuid": order.uuid,
                 # Enriched orderer information
                 "orderer_info": {
+                    "provider_id": row.provider_id,
+                    "provider_name": row.provider_name,
+                    "provider_identifier": row.provider_identifier,
+                    "provider_uuid": row.provider_uuid,
                     "person_id": row.orderer_person_id,
-                    "uuid": row.orderer_uuid,
+                    "person_uuid": row.orderer_uuid,
                     "name": orderer_name,
                     "gender": row.orderer_gender,
                     "birthdate": row.orderer_birthdate,
                 }
-                if row.orderer_person_id
+                if row.provider_id
                 else None,
                 # Enriched patient information
                 "patient_info": {

@@ -11,6 +11,7 @@ from .order import Order
 from .order_type import OrderType
 from .patient import Patient
 from .person import Person, PersonName
+from .provider import Provider
 from .visit import Visit
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     "Patient",
     "Person",
     "PersonName",
+    "Provider",
     "Visit",
 ]
