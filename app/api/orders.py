@@ -426,20 +426,14 @@ async def get_orders_by_visit_uuid_enriched(
     Get all orders for a particular visit (by visit UUID) with enriched creator and patient information.
     This endpoint includes the names and UUIDs of both the creator and patient.
     """
-    logger.info(
-        f"API: Getting enriched orders for visit UUID: {visit_uuid}, skip={skip}, limit={limit}"
-    )
-
     try:
         # Validate UUID format
         if not validate_uuid(visit_uuid):
-            logger.warning(f"Invalid UUID format: {visit_uuid}")
             raise HTTPException(
                 status_code=400,
                 detail="Invalid visit UUID format",
             )
 
-        logger.info("UUID validation passed, calling enriched CRUD method")
         orders_list = orders.get_orders_by_visit_uuid_with_person_info(
             db,
             visit_uuid=visit_uuid,
@@ -447,15 +441,13 @@ async def get_orders_by_visit_uuid_enriched(
             limit=limit,
         )
 
-        logger.info(f"API: Enriched CRUD method returned {len(orders_list)} orders")
         return orders_list
     except HTTPException:
         raise
     except Exception as e:
         logger.error(
-            f"API: Error getting enriched orders for visit UUID {visit_uuid}: {str(e)}"
+            f"Error getting enriched orders for visit UUID {visit_uuid}: {str(e)}"
         )
-        logger.exception("API: Full traceback:")
         raise HTTPException(
             status_code=400,
             detail=f"Failed to get orders: {str(e)}",
@@ -801,14 +793,13 @@ async def get_orders_by_type_and_visit_uuid(
                 detail="Invalid visit UUID format",
             )
 
-        orders_list = orders.get_orders_by_type_and_visit_uuid(
+        return orders.get_orders_by_type_and_visit_uuid_with_person_info(
             db,
             order_type_id=order_type_id,
             visit_uuid=visit_uuid,
             skip=skip,
             limit=limit,
         )
-        return orders_list
     except HTTPException:
         raise
     except Exception as e:
@@ -876,20 +867,14 @@ async def get_orders_by_visit_uuid(
     """
     Get all orders for a particular visit (by visit UUID)
     """
-    logger.info(
-        f"API: Getting orders for visit UUID: {visit_uuid}, skip={skip}, limit={limit}"
-    )
-
     try:
         # Validate UUID format
         if not validate_uuid(visit_uuid):
-            logger.warning(f"Invalid UUID format: {visit_uuid}")
             raise HTTPException(
                 status_code=400,
                 detail="Invalid visit UUID format",
             )
 
-        logger.info("UUID validation passed, calling CRUD method")
         orders_list = orders.get_orders_by_visit_uuid(
             db,
             visit_uuid=visit_uuid,
@@ -897,13 +882,11 @@ async def get_orders_by_visit_uuid(
             limit=limit,
         )
 
-        logger.info(f"API: CRUD method returned {len(orders_list)} orders")
         return orders_list
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"API: Error getting orders for visit UUID {visit_uuid}: {str(e)}")
-        logger.exception("API: Full traceback:")
+        logger.error(f"Error getting orders for visit UUID {visit_uuid}: {str(e)}")
         raise HTTPException(
             status_code=400,
             detail=f"Failed to get orders: {str(e)}",

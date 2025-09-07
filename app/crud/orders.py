@@ -414,6 +414,212 @@ class OrdersCRUD(BaseCRUD[Order]):
             .all()
         )
 
+    def get_orders_by_type_and_visit_uuid_with_person_info(
+        self,
+        db: Session,
+        order_type_id: int,
+        visit_uuid: str,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get orders by order type and visit UUID.
+
+        Args:
+            db: Database session
+            order_type_id: Order type ID to filter by
+            visit_uuid: Visit UUID to filter by
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List of orders
+        """
+        from app.models import Encounter, Visit, Person, PersonName
+        from sqlalchemy.orm import aliased
+
+        # Create aliases for Person and PersonName tables to join them multiple times
+        OrdererPerson = aliased(Person)
+        OrdererPersonName = aliased(PersonName)
+        PatientPerson = aliased(Person)
+        PatientPersonName = aliased(PersonName)
+
+        query = (
+            db.query(
+                Order,
+                # Orderer information
+                OrdererPerson.person_id.label("orderer_person_id"),
+                OrdererPerson.uuid.label("orderer_uuid"),
+                OrdererPerson.gender.label("orderer_gender"),
+                OrdererPerson.birthdate.label("orderer_birthdate"),
+                # Orderer name
+                OrdererPersonName.given_name.label("orderer_given_name"),
+                OrdererPersonName.family_name.label("orderer_family_name"),
+                OrdererPersonName.prefix.label("orderer_prefix"),
+                OrdererPersonName.middle_name.label("orderer_middle_name"),
+                OrdererPersonName.family_name2.label("orderer_family_name2"),
+                OrdererPersonName.family_name_suffix.label(
+                    "orderer_family_name_suffix"
+                ),
+                # Patient information
+                PatientPerson.person_id.label("patient_person_id"),
+                PatientPerson.uuid.label("patient_uuid"),
+                PatientPerson.gender.label("patient_gender"),
+                PatientPerson.birthdate.label("patient_birthdate"),
+                # Patient name
+                PatientPersonName.given_name.label("patient_given_name"),
+                PatientPersonName.family_name.label("patient_family_name"),
+                PatientPersonName.prefix.label("patient_prefix"),
+                PatientPersonName.middle_name.label("patient_middle_name"),
+                PatientPersonName.family_name2.label("patient_family_name2"),
+                PatientPersonName.family_name_suffix.label(
+                    "patient_family_name_suffix"
+                ),
+            )
+            .join(Encounter, Order.encounter_id == Encounter.encounter_id)
+            .join(Visit, Encounter.visit_id == Visit.visit_id)
+            # Join for orderer information
+            .outerjoin(
+                OrdererPerson,
+                and_(
+                    OrdererPerson.person_id == Order.orderer,
+                    OrdererPerson.voided == False,  # noqa: E712
+                ),
+            )
+            .outerjoin(
+                OrdererPersonName,
+                and_(
+                    OrdererPersonName.person_id == Order.orderer,
+                    OrdererPersonName.preferred == True,  # noqa: E712
+                    OrdererPersonName.voided == False,  # noqa: E712
+                ),
+            )
+            # Join for patient information
+            .outerjoin(
+                PatientPerson,
+                and_(
+                    PatientPerson.person_id == Order.patient_id,
+                    PatientPerson.voided == False,  # noqa: E712
+                ),
+            )
+            .outerjoin(
+                PatientPersonName,
+                and_(
+                    PatientPersonName.person_id == Order.patient_id,
+                    PatientPersonName.preferred == True,  # noqa: E712
+                    PatientPersonName.voided == False,  # noqa: E712
+                ),
+            )
+            .filter(
+                and_(
+                    Order.order_type_id == order_type_id,
+                    Visit.uuid == visit_uuid,
+                    Order.voided == False,  # noqa: E712
+                )
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+
+        results = query.all()
+
+        # Transform results into enriched order dictionaries
+        enriched_orders = []
+        for row in results:
+            order = row[0]  # The Order object is first in the tuple
+
+            # Build orderer name
+            orderer_name_parts = []
+            if row.orderer_prefix:
+                orderer_name_parts.append(row.orderer_prefix)
+            if row.orderer_given_name:
+                orderer_name_parts.append(row.orderer_given_name)
+            if row.orderer_middle_name:
+                orderer_name_parts.append(row.orderer_middle_name)
+            if row.orderer_family_name:
+                orderer_name_parts.append(row.orderer_family_name)
+            if row.orderer_family_name2:
+                orderer_name_parts.append(row.orderer_family_name2)
+            if row.orderer_family_name_suffix:
+                orderer_name_parts.append(row.orderer_family_name_suffix)
+            orderer_name = " ".join(orderer_name_parts) if orderer_name_parts else None
+
+            # Build patient name
+            patient_name_parts = []
+            if row.patient_prefix:
+                patient_name_parts.append(row.patient_prefix)
+            if row.patient_given_name:
+                patient_name_parts.append(row.patient_given_name)
+            if row.patient_middle_name:
+                patient_name_parts.append(row.patient_middle_name)
+            if row.patient_family_name:
+                patient_name_parts.append(row.patient_family_name)
+            if row.patient_family_name2:
+                patient_name_parts.append(row.patient_family_name2)
+            if row.patient_family_name_suffix:
+                patient_name_parts.append(row.patient_family_name_suffix)
+            patient_name = " ".join(patient_name_parts) if patient_name_parts else None
+
+            # Create enriched order dictionary
+            order_dict = {
+                "order_id": order.order_id,
+                "order_type_id": order.order_type_id,
+                "concept_id": order.concept_id,
+                "orderer": order.orderer,
+                "encounter_id": order.encounter_id,
+                "instructions": order.instructions,
+                "date_activated": order.date_activated,
+                "auto_expire_date": order.auto_expire_date,
+                "date_stopped": order.date_stopped,
+                "order_reason": order.order_reason,
+                "order_reason_non_coded": order.order_reason_non_coded,
+                "voided": order.voided,
+                "voided_by": order.voided_by,
+                "date_voided": order.date_voided,
+                "void_reason": order.void_reason,
+                "patient_id": order.patient_id,
+                "accession_number": order.accession_number,
+                "urgency": order.urgency,
+                "order_number": order.order_number,
+                "previous_order_id": order.previous_order_id,
+                "order_action": order.order_action,
+                "comment_to_fulfiller": order.comment_to_fulfiller,
+                "care_setting": order.care_setting,
+                "scheduled_date": order.scheduled_date,
+                "order_group_id": order.order_group_id,
+                "sort_weight": order.sort_weight,
+                "fulfiller_comment": order.fulfiller_comment,
+                "fulfiller_status": order.fulfiller_status,
+                "form_namespace_and_path": order.form_namespace_and_path,
+                "creator": order.creator,
+                "date_created": order.date_created,
+                "uuid": order.uuid,
+                # Enriched orderer information
+                "orderer_info": {
+                    "person_id": row.orderer_person_id,
+                    "uuid": row.orderer_uuid,
+                    "name": orderer_name,
+                    "gender": row.orderer_gender,
+                    "birthdate": row.orderer_birthdate,
+                }
+                if row.orderer_person_id
+                else None,
+                # Enriched patient information
+                "patient_info": {
+                    "person_id": row.patient_person_id,
+                    "uuid": row.patient_uuid,
+                    "name": patient_name,
+                    "gender": row.patient_gender,
+                    "birthdate": row.patient_birthdate,
+                }
+                if row.patient_person_id
+                else None,
+            }
+
+            enriched_orders.append(order_dict)
+
+        return enriched_orders
+
     def get_orders_by_visit_id(
         self, db: Session, visit_id: int, skip: int = 0, limit: int = 100
     ) -> List[Order]:
@@ -458,49 +664,20 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         from app.models import Encounter, Visit
 
-        logger.info(f"Getting orders for visit UUID: {visit_uuid}")
-
         try:
             # First, let's check if the visit exists
             visit = db.query(Visit).filter(Visit.uuid == visit_uuid).first()
             if not visit:
-                logger.warning(f"Visit with UUID {visit_uuid} not found")
                 return []
-
-            logger.info(
-                f"Found visit: ID={visit.visit_id}, patient_id={visit.patient_id}"
-            )
 
             # Check encounters for this visit
             encounters = (
                 db.query(Encounter).filter(Encounter.visit_id == visit.visit_id).all()
             )
-            logger.info(
-                f"Found {len(encounters)} encounters for visit {visit.visit_id}"
-            )
-
-            for encounter in encounters:
-                logger.info(
-                    f"Encounter: ID={encounter.encounter_id}, type={encounter.encounter_type}, voided={encounter.voided}"
-                )
 
             # Now check orders for these encounters
             encounter_ids = [e.encounter_id for e in encounters]
-            if encounter_ids:
-                orders_query = db.query(Order).filter(
-                    Order.encounter_id.in_(encounter_ids)
-                )
-                all_orders = orders_query.all()
-                logger.info(
-                    f"Found {len(all_orders)} total orders for encounters {encounter_ids}"
-                )
-
-                for order in all_orders:
-                    logger.info(
-                        f"Order: ID={order.order_id}, encounter_id={order.encounter_id}, voided={order.voided}, order_type_id={order.order_type_id}"
-                    )
-            else:
-                logger.warning("No encounters found, so no orders to check")
+            if not encounter_ids:
                 return []
 
             # Now run the actual query
@@ -513,17 +690,11 @@ class OrdersCRUD(BaseCRUD[Order]):
                 .filter(and_(Visit.uuid == visit_uuid, Order.voided == False))  # noqa: E712
             )
 
-            # Log the SQL query
-            logger.info(f"Executing query: {query}")
-
             result = query.offset(skip).limit(limit).all()
-            logger.info(f"Query returned {len(result)} orders")
-
             return result
 
         except Exception as e:
             logger.error(f"Error getting orders for visit UUID {visit_uuid}: {str(e)}")
-            logger.exception("Full traceback:")
             raise
 
     def get_order_with_person_info(
@@ -603,46 +774,24 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         from app.models import Person, PersonName
 
-        logger.info(f"Getting person info for person_id: {person_id}")
-
         # Get person record
         person = db.query(Person).filter(Person.person_id == person_id).first()
         if not person:
-            logger.warning(f"Person with ID {person_id} not found")
             return None
-
-        logger.info(
-            f"Found person: ID={person.person_id}, UUID={person.uuid}, gender={person.gender}"
-        )
-
-        # Debug: Try raw SQL first
-        from sqlalchemy import text
-
-        raw_sql = text(
-            "SELECT * FROM person_name WHERE person_id = :person_id AND voided = 0"
-        )
-        raw_result = db.execute(raw_sql, {"person_id": person_id}).fetchall()
-        logger.info(f"Raw SQL found {len(raw_result)} names for person {person_id}")
-        for row in raw_result:
-            logger.info(f"Raw SQL row: {dict(row._mapping)}")
 
         # Get all names for this person (not just preferred)
         # Note: Using PersonName.voided == False instead of not PersonName.voided
         # because SQLAlchemy translates 'not PersonName.voided' to 'false = 1' in some DB configs
-        query = db.query(PersonName).filter(
-            and_(
-                PersonName.person_id == person_id,
-                PersonName.voided == False,  # noqa: E712
+        all_names = (
+            db.query(PersonName)
+            .filter(
+                and_(
+                    PersonName.person_id == person_id,
+                    PersonName.voided == False,  # noqa: E712
+                )
             )
+            .all()
         )
-        logger.info(f"SQLAlchemy query: {query}")
-        all_names = query.all()
-
-        logger.info(f"Found {len(all_names)} names for person {person_id}")
-        for name in all_names:
-            logger.info(
-                f"Name: ID={name.person_name_id}, preferred={name.preferred} (type: {type(name.preferred)}), given={name.given_name}, family={name.family_name}"
-            )
 
         # Get preferred name
         preferred_name = (
@@ -660,9 +809,6 @@ class OrdersCRUD(BaseCRUD[Order]):
         if not preferred_name and all_names:
             # If no preferred name, use the first non-voided name
             preferred_name = all_names[0]
-            logger.info(
-                f"No preferred name found, using first name: {preferred_name.given_name} {preferred_name.family_name}"
-            )
 
         # Build name string
         name_parts = []
@@ -681,7 +827,6 @@ class OrdersCRUD(BaseCRUD[Order]):
                 name_parts.append(preferred_name.family_name_suffix)
 
         full_name = " ".join(name_parts) if name_parts else None
-        logger.info(f"Built full name: '{full_name}'")
 
         return {
             "person_id": person.person_id,
@@ -708,19 +853,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         from app.models import Encounter, Visit
 
-        logger.info(f"Getting orders with person info for visit UUID: {visit_uuid}")
-
         try:
-            # First, let's check if the visit exists
-            visit = db.query(Visit).filter(Visit.uuid == visit_uuid).first()
-            if not visit:
-                logger.warning(f"Visit with UUID {visit_uuid} not found")
-                return []
-
-            logger.info(
-                f"Found visit: ID={visit.visit_id}, patient_id={visit.patient_id}"
-            )
-
             # Get orders using the same logic as the regular method
             query = (
                 db.query(Order)
@@ -730,9 +863,6 @@ class OrdersCRUD(BaseCRUD[Order]):
             )
 
             orders_list = query.offset(skip).limit(limit).all()
-            logger.info(
-                f"Found {len(orders_list)} orders, now enriching with person info"
-            )
 
             # Enrich each order with person information
             enriched_orders = []
@@ -783,14 +913,12 @@ class OrdersCRUD(BaseCRUD[Order]):
 
                 enriched_orders.append(order_dict)
 
-            logger.info(f"Returning {len(enriched_orders)} enriched orders")
             return enriched_orders
 
         except Exception as e:
             logger.error(
                 f"Error getting orders with person info for visit UUID {visit_uuid}: {str(e)}"
             )
-            logger.exception("Full traceback:")
             raise
 
 
