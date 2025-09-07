@@ -615,17 +615,26 @@ class OrdersCRUD(BaseCRUD[Order]):
             f"Found person: ID={person.person_id}, UUID={person.uuid}, gender={person.gender}"
         )
 
-        # Get all names for this person (not just preferred)
-        all_names = (
-            db.query(PersonName)
-            .filter(
-                and_(
-                    PersonName.person_id == person_id,
-                    not PersonName.voided,
-                )
-            )
-            .all()
+        # Debug: Try raw SQL first
+        from sqlalchemy import text
+
+        raw_sql = text(
+            "SELECT * FROM person_name WHERE person_id = :person_id AND voided = 0"
         )
+        raw_result = db.execute(raw_sql, {"person_id": person_id}).fetchall()
+        logger.info(f"Raw SQL found {len(raw_result)} names for person {person_id}")
+        for row in raw_result:
+            logger.info(f"Raw SQL row: {dict(row._mapping)}")
+
+        # Get all names for this person (not just preferred)
+        query = db.query(PersonName).filter(
+            and_(
+                PersonName.person_id == person_id,
+                not PersonName.voided,
+            )
+        )
+        logger.info(f"SQLAlchemy query: {query}")
+        all_names = query.all()
 
         logger.info(f"Found {len(all_names)} names for person {person_id}")
         for name in all_names:
