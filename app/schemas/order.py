@@ -17,6 +17,20 @@ class PersonInfo(BaseModel):
     birthdate: Optional[datetime] = None
 
 
+class OrdererInfo(BaseModel):
+    """Schema for orderer information (provider + person)"""
+
+    provider_id: Optional[int] = None
+    provider_name: Optional[str] = None
+    provider_identifier: Optional[str] = None
+    provider_uuid: Optional[str] = None
+    person_id: Optional[int] = None
+    person_uuid: Optional[str] = None
+    name: Optional[str] = None
+    gender: Optional[str] = None
+    birthdate: Optional[datetime] = None
+
+
 class OrderBase(BaseModel):
     """Base schema for order data"""
 
@@ -78,6 +92,7 @@ class OrderResponse(OrderBase):
     uuid: str
     creator_info: Optional[PersonInfo] = None
     patient_info: Optional[PersonInfo] = None
+    orderer_info: Optional[OrdererInfo] = None
 
     class Config:
         from_attributes = True
