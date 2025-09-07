@@ -1,3 +1,4 @@
+import logging
 from fastapi import (
     APIRouter,
     Depends,
@@ -17,6 +18,8 @@ from app.schemas import (
     OrderUpdateResponse,
 )
 from app.utils import validate_uuid
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["orders"])
 
@@ -816,24 +819,34 @@ async def get_orders_by_visit_uuid(
     """
     Get all orders for a particular visit (by visit UUID)
     """
+    logger.info(
+        f"API: Getting orders for visit UUID: {visit_uuid}, skip={skip}, limit={limit}"
+    )
+
     try:
         # Validate UUID format
         if not validate_uuid(visit_uuid):
+            logger.warning(f"Invalid UUID format: {visit_uuid}")
             raise HTTPException(
                 status_code=400,
                 detail="Invalid visit UUID format",
             )
 
+        logger.info("UUID validation passed, calling CRUD method")
         orders_list = orders.get_orders_by_visit_uuid(
             db,
             visit_uuid=visit_uuid,
             skip=skip,
             limit=limit,
         )
+
+        logger.info(f"API: CRUD method returned {len(orders_list)} orders")
         return orders_list
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"API: Error getting orders for visit UUID {visit_uuid}: {str(e)}")
+        logger.exception("API: Full traceback:")
         raise HTTPException(
             status_code=400,
             detail=f"Failed to get orders: {str(e)}",

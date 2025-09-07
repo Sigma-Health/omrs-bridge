@@ -1,3 +1,5 @@
+import logging
+
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -5,6 +7,9 @@ from datetime import datetime
 
 from .base import BaseCRUD
 from app.models import Order
+
+
+logger = logging.getLogger(__name__)
 
 
 class OrdersCRUD(BaseCRUD[Order]):
@@ -447,21 +452,77 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         from app.models import Encounter, Visit
 
-        return (
-            db.query(Order)
-            .join(Encounter, Order.encounter_id == Encounter.encounter_id)
-            .join(Visit, Encounter.visit_id == Visit.visit_id)
-            .filter(and_(Visit.uuid == visit_uuid, not Order.voided))
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+        logger.info(f"Getting orders for visit UUID: {visit_uuid}")
+
+        try:
+            # First, let's check if the visit exists
+            visit = db.query(Visit).filter(Visit.uuid == visit_uuid).first()
+            if not visit:
+                logger.warning(f"Visit with UUID {visit_uuid} not found")
+                return []
+
+            logger.info(
+                f"Found visit: ID={visit.visit_id}, patient_id={visit.patient_id}"
+            )
+
+            # Check encounters for this visit
+            encounters = (
+                db.query(Encounter).filter(Encounter.visit_id == visit.visit_id).all()
+            )
+            logger.info(
+                f"Found {len(encounters)} encounters for visit {visit.visit_id}"
+            )
+
+            for encounter in encounters:
+                logger.info(
+                    f"Encounter: ID={encounter.encounter_id}, type={encounter.encounter_type}, voided={encounter.voided}"
+                )
+
+            # Now check orders for these encounters
+            encounter_ids = [e.encounter_id for e in encounters]
+            if encounter_ids:
+                orders_query = db.query(Order).filter(
+                    Order.encounter_id.in_(encounter_ids)
+                )
+                all_orders = orders_query.all()
+                logger.info(
+                    f"Found {len(all_orders)} total orders for encounters {encounter_ids}"
+                )
+
+                for order in all_orders:
+                    logger.info(
+                        f"Order: ID={order.order_id}, encounter_id={order.encounter_id}, voided={order.voided}, order_type_id={order.order_type_id}"
+                    )
+            else:
+                logger.warning("No encounters found, so no orders to check")
+                return []
+
+            # Now run the actual query
+            query = (
+                db.query(Order)
+                .join(Encounter, Order.encounter_id == Encounter.encounter_id)
+                .join(Visit, Encounter.visit_id == Visit.visit_id)
+                .filter(and_(Visit.uuid == visit_uuid, not Order.voided))
+            )
+
+            # Log the SQL query
+            logger.info(f"Executing query: {query}")
+
+            result = query.offset(skip).limit(limit).all()
+            logger.info(f"Query returned {len(result)} orders")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error getting orders for visit UUID {visit_uuid}: {str(e)}")
+            logger.exception("Full traceback:")
+            raise
 
     def get_order_with_person_info(
         self, db: Session, order_id: int
     ) -> Optional[Dict[str, Any]]:
         """
-        Get order with enriched creator and patient information including names and UUIDs.
+        Get order with creator and patient information.
 
         Args:
             db: Database session
