@@ -68,7 +68,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
             List of active visits
         """
         query = db.query(self.model).filter(
-            and_(self.model.voided == False, self.model.date_stopped.is_(None))
+            and_(self.model.voided == False, self.model.date_stopped.is_(None))  # noqa: E712
         )
 
         if patient_id:
@@ -101,7 +101,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
             List of completed visits
         """
         query = db.query(self.model).filter(
-            and_(self.model.voided == False, self.model.date_stopped.isnot(None))
+            and_(self.model.voided == False, self.model.date_stopped.isnot(None))  # noqa: E712
         )
 
         if patient_id:
@@ -133,7 +133,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
         Returns:
             List of voided visits
         """
-        query = db.query(self.model).filter(self.model.voided == True)
+        query = db.query(self.model).filter(self.model.voided == True)  # noqa: E712
 
         if patient_id:
             query = query.filter(self.model.patient_id == patient_id)
@@ -300,6 +300,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         patient_id: Optional[int] = None,
+        days: Optional[int] = None,
         skip: int = 0,
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
@@ -313,6 +314,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
             start_date: Optional start date (YYYY-MM-DD format)
             end_date: Optional end date (YYYY-MM-DD format)
             patient_id: Optional patient ID to filter by
+            days: Optional number of days to look back from today (e.g., 1 for today)
             skip: Number of records to skip
             limit: Maximum number of records to return
 
@@ -378,6 +380,18 @@ class VisitsCRUD(BaseCRUD[Visit]):
             query = query.filter(self.model.date_started >= start_date)
         elif end_date:
             query = query.filter(self.model.date_started <= end_date)
+        elif days is not None:
+            # Filter by number of days from today
+            from datetime import datetime, timedelta
+            from sqlalchemy import func
+
+            # Calculate the start date (N days ago from today)
+            start_date_days_ago = datetime.now().date() - timedelta(days=days - 1)
+
+            # Filter visits from the last N days (inclusive of today)
+            query = query.filter(
+                func.date(self.model.date_started) >= start_date_days_ago
+            )
 
         # Apply patient filter if provided
         if patient_id:

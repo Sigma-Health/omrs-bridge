@@ -283,7 +283,7 @@ async def get_visits_by_date_range(
 
 
 @router.get("/with-order-type/{order_type_id}", response_model=List[VisitResponse])
-async def get_visits_with_order_type(
+async def get_visits_with_order_type_enriched(
     order_type_id: int = Path(..., description="Order type ID"),
     start_date: Optional[str] = Query(
         None,
@@ -296,6 +296,11 @@ async def get_visits_with_order_type(
     patient_id: Optional[int] = Query(
         None,
         description="Filter by patient ID",
+    ),
+    days: Optional[int] = Query(
+        None,
+        ge=1,
+        description="Number of days to look back from today (e.g., 1 for today, 2 for today and yesterday)",
     ),
     skip: int = Query(
         0,
@@ -313,55 +318,8 @@ async def get_visits_with_order_type(
 ):
     """
     Get visits that have orders of a particular order type.
-    This endpoint returns visits (not the actual orders) that contain orders of the specified type.
-    You can filter by date range and patient ID.
-    """
-    return visits.get_visits_with_order_type(
-        db,
-        order_type_id=order_type_id,
-        start_date=start_date,
-        end_date=end_date,
-        patient_id=patient_id,
-        skip=skip,
-        limit=limit,
-    )
-
-
-@router.get(
-    "/with-order-type/{order_type_id}/enriched", response_model=List[VisitResponse]
-)
-async def get_visits_with_order_type_enriched(
-    order_type_id: int = Path(..., description="Order type ID"),
-    start_date: Optional[str] = Query(
-        None,
-        description="Start date (YYYY-MM-DD format)",
-    ),
-    end_date: Optional[str] = Query(
-        None,
-        description="End date (YYYY-MM-DD format)",
-    ),
-    patient_id: Optional[int] = Query(
-        None,
-        description="Filter by patient ID",
-    ),
-    skip: int = Query(
-        0,
-        ge=0,
-        description="Number of records to skip",
-    ),
-    limit: int = Query(
-        100,
-        ge=1,
-        le=1000,
-        description="Number of records to return",
-    ),
-    db: Session = Depends(get_db),
-    api_key: str = Depends(get_current_api_key),
-):
-    """
-    Get visits that have orders of a particular order type with enriched patient information.
-    This endpoint returns visits with patient details (name, gender, birthdate) that contain orders of the specified type.
-    You can filter by date range and patient ID.
+    This endpoint returns visits with patient details (name, gender, birthdate)
+    You can filter by date range, patient ID, or number of days.
     """
     return visits.get_visits_with_order_type_and_patient_info(
         db,
@@ -369,6 +327,7 @@ async def get_visits_with_order_type_enriched(
         start_date=start_date,
         end_date=end_date,
         patient_id=patient_id,
+        days=days,
         skip=skip,
         limit=limit,
     )
