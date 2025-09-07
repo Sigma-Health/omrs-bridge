@@ -630,21 +630,38 @@ class OrdersCRUD(BaseCRUD[Order]):
         logger.info(f"Found {len(all_names)} names for person {person_id}")
         for name in all_names:
             logger.info(
-                f"Name: ID={name.person_name_id}, preferred={name.preferred}, given={name.given_name}, family={name.family_name}"
+                f"Name: ID={name.person_name_id}, preferred={name.preferred} (type: {type(name.preferred)}), given={name.given_name}, family={name.family_name}"
             )
 
-        # Get preferred name
+        # Get preferred name - try different approaches
         preferred_name = (
             db.query(PersonName)
             .filter(
                 and_(
                     PersonName.person_id == person_id,
-                    PersonName.preferred,
+                    PersonName.preferred == True,  # noqa: E712
                     not PersonName.voided,
                 )
             )
             .first()
         )
+
+        if not preferred_name:
+            # Try with integer comparison
+            preferred_name = (
+                db.query(PersonName)
+                .filter(
+                    and_(
+                        PersonName.person_id == person_id,
+                        PersonName.preferred == 1,
+                        not PersonName.voided,
+                    )
+                )
+                .first()
+            )
+            logger.info(
+                f"Tried integer comparison for preferred name, found: {preferred_name is not None}"
+            )
 
         if not preferred_name and all_names:
             # If no preferred name, use the first non-voided name
