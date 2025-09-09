@@ -740,12 +740,14 @@ class OrdersCRUD(BaseCRUD[Order]):
                     Concept.retired == False,  # noqa: E712
                 ),
             )
-            # Join for concept name information (English locale)
+            # Join for concept name information (English locale, FULLY_SPECIFIED type)
             .outerjoin(
                 ConceptName,
                 and_(
                     ConceptName.concept_id == Concept.concept_id,
                     ConceptName.locale == "en",  # Filter for English locale
+                    ConceptName.concept_name_type
+                    == "FULLY_SPECIFIED",  # Only FULLY_SPECIFIED names
                     ConceptName.voided == False,  # noqa: E712
                 ),
             )
