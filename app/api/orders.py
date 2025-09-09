@@ -7,7 +7,7 @@ from fastapi import (
     Path,
 )
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.database import get_db
 from app.auth import get_current_api_key
 from app.crud import orders
@@ -719,22 +719,14 @@ async def get_orders_by_type_and_visit_id(
 async def get_orders_by_type_and_visit_uuid(
     order_type_id: int = Path(..., description="Order type ID"),
     visit_uuid: str = Path(..., description="Visit UUID"),
-    skip: int = Query(
-        0,
-        ge=0,
-        description="Number of records to skip",
-    ),
-    limit: int = Query(
-        100,
-        ge=1,
-        le=1000,
-        description="Number of records to return",
-    ),
+    skip: int = Query(0, ge=0, description="# of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="# of records to return"),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
     """
-    Get all orders of a specific order type for a particular visit (by visit UUID)
+    Get all orders of a specific order type for a particular visit
+    Use visit UUID to get orders
     """
     try:
         # Validate UUID format

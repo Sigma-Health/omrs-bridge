@@ -375,7 +375,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             .all()
         )
 
-    def get_orders_by_type_and_visit_uuid(
+    def get_orders_by_type_and_visit_uuidx(
         self,
         db: Session,
         order_type_id: int,
@@ -394,9 +394,9 @@ class OrdersCRUD(BaseCRUD[Order]):
             limit: Maximum number of records to return
 
         Returns:
-            List of orders
+            List of orders with concept details
         """
-        from app.models import Encounter, Visit, Person, PersonName, Provider
+        from app.models import Encounter, Visit, Person, PersonName, Provider, Concept
         from sqlalchemy.orm import aliased
 
         # Create aliases for Person and PersonName tables to join them multiple times
@@ -603,6 +603,522 @@ class OrdersCRUD(BaseCRUD[Order]):
             enriched_orders.append(order_dict)
 
         return enriched_orders
+
+    def get_orders_by_type_and_visit_uuid(
+        self,
+        db: Session,
+        order_type_id: int,
+        visit_uuid: str,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get orders by order type and visit UUID with concept details.
+
+        Args:
+            db: Database session
+            order_type_id: Order type ID to filter by
+            visit_uuid: Visit UUID to filter by
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List of orders with concept details
+        """
+        from app.models import Encounter, Visit, Person, PersonName, Provider, Concept
+        from sqlalchemy.orm import aliased
+
+        # Create aliases for Person and PersonName tables to join them multiple times
+        OrdererPerson = aliased(Person)
+        OrdererPersonName = aliased(PersonName)
+        PatientPerson = aliased(Person)
+        PatientPersonName = aliased(PersonName)
+
+        query = (
+            db.query(
+                Order,
+                # Provider information
+                Provider.provider_id.label("provider_id"),
+                Provider.name.label("provider_name"),
+                Provider.identifier.label("provider_identifier"),
+                Provider.uuid.label("provider_uuid"),
+                # Orderer information
+                OrdererPerson.person_id.label("orderer_person_id"),
+                OrdererPerson.uuid.label("orderer_uuid"),
+                OrdererPerson.gender.label("orderer_gender"),
+                OrdererPerson.birthdate.label("orderer_birthdate"),
+                # Orderer name
+                OrdererPersonName.given_name.label("orderer_given_name"),
+                OrdererPersonName.family_name.label("orderer_family_name"),
+                OrdererPersonName.prefix.label("orderer_prefix"),
+                OrdererPersonName.middle_name.label("orderer_middle_name"),
+                OrdererPersonName.family_name2.label("orderer_family_name2"),
+                OrdererPersonName.family_name_suffix.label(
+                    "orderer_family_name_suffix"
+                ),
+                # Patient information
+                PatientPerson.person_id.label("patient_person_id"),
+                PatientPerson.uuid.label("patient_uuid"),
+                PatientPerson.gender.label("patient_gender"),
+                PatientPerson.birthdate.label("patient_birthdate"),
+                # Patient name
+                PatientPersonName.given_name.label("patient_given_name"),
+                PatientPersonName.family_name.label("patient_family_name"),
+                PatientPersonName.prefix.label("patient_prefix"),
+                PatientPersonName.middle_name.label("patient_middle_name"),
+                PatientPersonName.family_name2.label("patient_family_name2"),
+                PatientPersonName.family_name_suffix.label(
+                    "patient_family_name_suffix"
+                ),
+                # Concept information
+                Concept.concept_id.label("concept_id"),
+                Concept.uuid.label("concept_uuid"),
+                Concept.short_name.label("concept_short_name"),
+                Concept.description.label("concept_description"),
+                Concept.is_set.label("concept_is_set"),
+            )
+            .join(Encounter, Order.encounter_id == Encounter.encounter_id)
+            .join(Visit, Encounter.visit_id == Visit.visit_id)
+            # Join for orderer information through provider table
+            .outerjoin(
+                Provider,
+                and_(
+                    Provider.provider_id == Order.orderer,
+                    Provider.retired == False,  # noqa: E712
+                ),
+            )
+            .outerjoin(
+                OrdererPerson,
+                and_(
+                    OrdererPerson.person_id == Provider.person_id,
+                    OrdererPerson.voided == False,  # noqa: E712
+                ),
+            )
+            .outerjoin(
+                OrdererPersonName,
+                and_(
+                    OrdererPersonName.person_id == Order.orderer,
+                    OrdererPersonName.preferred == True,  # noqa: E712
+                    OrdererPersonName.voided == False,  # noqa: E712
+                ),
+            )
+            # Join for patient information
+            .outerjoin(
+                PatientPerson,
+                and_(
+                    PatientPerson.person_id == Order.patient_id,
+                    PatientPerson.voided == False,  # noqa: E712
+                ),
+            )
+            .outerjoin(
+                PatientPersonName,
+                and_(
+                    PatientPersonName.person_id == Order.patient_id,
+                    PatientPersonName.preferred == True,  # noqa: E712
+                    PatientPersonName.voided == False,  # noqa: E712
+                ),
+            )
+            # Join for concept information
+            .outerjoin(
+                Concept,
+                and_(
+                    Concept.concept_id == Order.concept_id,
+                    Concept.retired == False,  # noqa: E712
+                ),
+            )
+            .filter(
+                and_(
+                    Order.order_type_id == order_type_id,
+                    Visit.uuid == visit_uuid,
+                    Order.voided == False,  # noqa: E712
+                )
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+
+        results = query.all()
+
+        # Transform results into enriched order dictionaries
+        enriched_orders = []
+        for row in results:
+            order = row[0]  # The Order object is first in the tuple
+
+            # Build orderer name - prefer person name, fallback to provider name
+            orderer_name_parts = []
+            if row.orderer_prefix:
+                orderer_name_parts.append(row.orderer_prefix)
+            if row.orderer_given_name:
+                orderer_name_parts.append(row.orderer_given_name)
+            if row.orderer_middle_name:
+                orderer_name_parts.append(row.orderer_middle_name)
+            if row.orderer_family_name:
+                orderer_name_parts.append(row.orderer_family_name)
+            if row.orderer_family_name2:
+                orderer_name_parts.append(row.orderer_family_name2)
+            if row.orderer_family_name_suffix:
+                orderer_name_parts.append(row.orderer_family_name_suffix)
+
+            # Use person name if available, otherwise use provider name
+            if orderer_name_parts:
+                orderer_name = " ".join(orderer_name_parts)
+            elif row.provider_name:
+                orderer_name = row.provider_name
+            else:
+                orderer_name = None
+
+            # Build patient name
+            patient_name_parts = []
+            if row.patient_prefix:
+                patient_name_parts.append(row.patient_prefix)
+            if row.patient_given_name:
+                patient_name_parts.append(row.patient_given_name)
+            if row.patient_middle_name:
+                patient_name_parts.append(row.patient_middle_name)
+            if row.patient_family_name:
+                patient_name_parts.append(row.patient_family_name)
+            if row.patient_family_name2:
+                patient_name_parts.append(row.patient_family_name2)
+            if row.patient_family_name_suffix:
+                patient_name_parts.append(row.patient_family_name_suffix)
+            patient_name = " ".join(patient_name_parts) if patient_name_parts else None
+
+            # Create enriched order dictionary
+            order_dict = {
+                "order_id": order.order_id,
+                "order_type_id": order.order_type_id,
+                "concept_id": order.concept_id,
+                "orderer": order.orderer,
+                "encounter_id": order.encounter_id,
+                "instructions": order.instructions,
+                "date_activated": order.date_activated,
+                "auto_expire_date": order.auto_expire_date,
+                "date_stopped": order.date_stopped,
+                "order_reason": order.order_reason,
+                "order_reason_non_coded": order.order_reason_non_coded,
+                "voided": order.voided,
+                "voided_by": order.voided_by,
+                "date_voided": order.date_voided,
+                "void_reason": order.void_reason,
+                "patient_id": order.patient_id,
+                "accession_number": order.accession_number,
+                "urgency": order.urgency,
+                "order_number": order.order_number,
+                "previous_order_id": order.previous_order_id,
+                "order_action": order.order_action,
+                "comment_to_fulfiller": order.comment_to_fulfiller,
+                "care_setting": order.care_setting,
+                "scheduled_date": order.scheduled_date,
+                "order_group_id": order.order_group_id,
+                "sort_weight": order.sort_weight,
+                "fulfiller_comment": order.fulfiller_comment,
+                "fulfiller_status": order.fulfiller_status,
+                "form_namespace_and_path": order.form_namespace_and_path,
+                "creator": order.creator,
+                "date_created": order.date_created,
+                "uuid": order.uuid,
+                # Enriched orderer information
+                "orderer_info": {
+                    "provider_id": row.provider_id,
+                    "provider_name": row.provider_name,
+                    "provider_identifier": row.provider_identifier,
+                    "provider_uuid": row.provider_uuid,
+                    "person_id": row.orderer_person_id,
+                    "person_uuid": row.orderer_uuid,
+                    "name": orderer_name,
+                    "gender": row.orderer_gender,
+                    "birthdate": row.orderer_birthdate,
+                }
+                if row.provider_id
+                else None,
+                # Enriched patient information
+                "patient_info": {
+                    "person_id": row.patient_person_id,
+                    "uuid": row.patient_uuid,
+                    "name": patient_name,
+                    "gender": row.patient_gender,
+                    "birthdate": row.patient_birthdate,
+                }
+                if row.patient_person_id
+                else None,
+                # Enriched concept information
+                "concept_info": {
+                    "concept_id": row.concept_id,
+                    "uuid": row.concept_uuid,
+                    "short_name": row.concept_short_name,
+                    "description": row.concept_description,
+                    "is_set": row.concept_is_set,
+                }
+                if row.concept_id
+                else None,
+            }
+
+            enriched_orders.append(order_dict)
+
+        return enriched_orders
+
+    def get_orders_by_type_and_visit_uuid_paginated(
+        self,
+        db: Session,
+        order_type_id: int,
+        visit_uuid: str,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        """
+        Get orders by order type and visit UUID with pagination metadata.
+
+        Args:
+            db: Database session
+            order_type_id: Order type ID to filter by
+            visit_uuid: Visit UUID to filter by
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            Dictionary with paginated orders and metadata
+        """
+        from app.models import Encounter, Visit, Person, PersonName, Provider
+        from sqlalchemy.orm import aliased
+
+        # Create aliases for Person and PersonName tables to join them multiple times
+        OrdererPerson = aliased(Person)
+        OrdererPersonName = aliased(PersonName)
+        PatientPerson = aliased(Person)
+        PatientPersonName = aliased(PersonName)
+
+        # Base query for counting total records
+        base_query = (
+            db.query(Order)
+            .join(Encounter, Order.encounter_id == Encounter.encounter_id)
+            .join(Visit, Encounter.visit_id == Visit.visit_id)
+            .filter(
+                and_(
+                    Order.order_type_id == order_type_id,
+                    Visit.uuid == visit_uuid,
+                    Order.voided == False,  # noqa: E712
+                )
+            )
+        )
+
+        # Get total count
+        total = base_query.count()
+
+        # Main query with joins for enriched data
+        query = (
+            db.query(
+                Order,
+                # Provider information
+                Provider.provider_id.label("provider_id"),
+                Provider.name.label("provider_name"),
+                Provider.identifier.label("provider_identifier"),
+                Provider.uuid.label("provider_uuid"),
+                # Orderer information
+                OrdererPerson.person_id.label("orderer_person_id"),
+                OrdererPerson.uuid.label("orderer_uuid"),
+                OrdererPerson.gender.label("orderer_gender"),
+                OrdererPerson.birthdate.label("orderer_birthdate"),
+                # Orderer name
+                OrdererPersonName.given_name.label("orderer_given_name"),
+                OrdererPersonName.family_name.label("orderer_family_name"),
+                OrdererPersonName.prefix.label("orderer_prefix"),
+                OrdererPersonName.middle_name.label("orderer_middle_name"),
+                OrdererPersonName.family_name2.label("orderer_family_name2"),
+                OrdererPersonName.family_name_suffix.label(
+                    "orderer_family_name_suffix"
+                ),
+                # Patient information
+                PatientPerson.person_id.label("patient_person_id"),
+                PatientPerson.uuid.label("patient_uuid"),
+                PatientPerson.gender.label("patient_gender"),
+                PatientPerson.birthdate.label("patient_birthdate"),
+                # Patient name
+                PatientPersonName.given_name.label("patient_given_name"),
+                PatientPersonName.family_name.label("patient_family_name"),
+                PatientPersonName.prefix.label("patient_prefix"),
+                PatientPersonName.middle_name.label("patient_middle_name"),
+                PatientPersonName.family_name2.label("patient_family_name2"),
+                PatientPersonName.family_name_suffix.label(
+                    "patient_family_name_suffix"
+                ),
+            )
+            .join(Encounter, Order.encounter_id == Encounter.encounter_id)
+            .join(Visit, Encounter.visit_id == Visit.visit_id)
+            # Join for orderer information through provider table
+            .outerjoin(
+                Provider,
+                and_(
+                    Provider.provider_id == Order.orderer,
+                    Provider.retired == False,  # noqa: E712
+                ),
+            )
+            .outerjoin(
+                OrdererPerson,
+                and_(
+                    OrdererPerson.person_id == Provider.person_id,
+                    OrdererPerson.voided == False,  # noqa: E712
+                ),
+            )
+            .outerjoin(
+                OrdererPersonName,
+                and_(
+                    OrdererPersonName.person_id == Order.orderer,
+                    OrdererPersonName.preferred == True,  # noqa: E712
+                    OrdererPersonName.voided == False,  # noqa: E712
+                ),
+            )
+            # Join for patient information
+            .outerjoin(
+                PatientPerson,
+                and_(
+                    PatientPerson.person_id == Order.patient_id,
+                    PatientPerson.voided == False,  # noqa: E712
+                ),
+            )
+            .outerjoin(
+                PatientPersonName,
+                and_(
+                    PatientPersonName.person_id == Order.patient_id,
+                    PatientPersonName.preferred == True,  # noqa: E712
+                    PatientPersonName.voided == False,  # noqa: E712
+                ),
+            )
+            .filter(
+                and_(
+                    Order.order_type_id == order_type_id,
+                    Visit.uuid == visit_uuid,
+                    Order.voided == False,  # noqa: E712
+                )
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+
+        results = query.all()
+
+        # Transform results into enriched order dictionaries
+        enriched_orders = []
+        for row in results:
+            order = row[0]  # The Order object is first in the tuple
+
+            # Build orderer name - prefer person name, fallback to provider name
+            orderer_name_parts = []
+            if row.orderer_prefix:
+                orderer_name_parts.append(row.orderer_prefix)
+            if row.orderer_given_name:
+                orderer_name_parts.append(row.orderer_given_name)
+            if row.orderer_middle_name:
+                orderer_name_parts.append(row.orderer_middle_name)
+            if row.orderer_family_name:
+                orderer_name_parts.append(row.orderer_family_name)
+            if row.orderer_family_name2:
+                orderer_name_parts.append(row.orderer_family_name2)
+            if row.orderer_family_name_suffix:
+                orderer_name_parts.append(row.orderer_family_name_suffix)
+
+            # Use person name if available, otherwise use provider name
+            if orderer_name_parts:
+                orderer_name = " ".join(orderer_name_parts)
+            elif row.provider_name:
+                orderer_name = row.provider_name
+            else:
+                orderer_name = None
+
+            # Build patient name
+            patient_name_parts = []
+            if row.patient_prefix:
+                patient_name_parts.append(row.patient_prefix)
+            if row.patient_given_name:
+                patient_name_parts.append(row.patient_given_name)
+            if row.patient_middle_name:
+                patient_name_parts.append(row.patient_middle_name)
+            if row.patient_family_name:
+                patient_name_parts.append(row.patient_family_name)
+            if row.patient_family_name2:
+                patient_name_parts.append(row.patient_family_name2)
+            if row.patient_family_name_suffix:
+                patient_name_parts.append(row.patient_family_name_suffix)
+            patient_name = " ".join(patient_name_parts) if patient_name_parts else None
+
+            # Create enriched order dictionary
+            order_dict = {
+                "order_id": order.order_id,
+                "order_type_id": order.order_type_id,
+                "concept_id": order.concept_id,
+                "orderer": order.orderer,
+                "encounter_id": order.encounter_id,
+                "instructions": order.instructions,
+                "date_activated": order.date_activated,
+                "auto_expire_date": order.auto_expire_date,
+                "date_stopped": order.date_stopped,
+                "order_reason": order.order_reason,
+                "order_reason_non_coded": order.order_reason_non_coded,
+                "voided": order.voided,
+                "voided_by": order.voided_by,
+                "date_voided": order.date_voided,
+                "void_reason": order.void_reason,
+                "patient_id": order.patient_id,
+                "accession_number": order.accession_number,
+                "urgency": order.urgency,
+                "order_number": order.order_number,
+                "previous_order_id": order.previous_order_id,
+                "order_action": order.order_action,
+                "comment_to_fulfiller": order.comment_to_fulfiller,
+                "care_setting": order.care_setting,
+                "scheduled_date": order.scheduled_date,
+                "order_group_id": order.order_group_id,
+                "sort_weight": order.sort_weight,
+                "fulfiller_comment": order.fulfiller_comment,
+                "fulfiller_status": order.fulfiller_status,
+                "form_namespace_and_path": order.form_namespace_and_path,
+                "creator": order.creator,
+                "date_created": order.date_created,
+                "uuid": order.uuid,
+                # Enriched orderer information
+                "orderer_info": {
+                    "provider_id": row.provider_id,
+                    "provider_name": row.provider_name,
+                    "provider_identifier": row.provider_identifier,
+                    "provider_uuid": row.provider_uuid,
+                    "person_id": row.orderer_person_id,
+                    "person_uuid": row.orderer_uuid,
+                    "name": orderer_name,
+                    "gender": row.orderer_gender,
+                    "birthdate": row.orderer_birthdate,
+                }
+                if row.provider_id
+                else None,
+                # Enriched patient information
+                "patient_info": {
+                    "person_id": row.patient_person_id,
+                    "uuid": row.patient_uuid,
+                    "name": patient_name,
+                    "gender": row.patient_gender,
+                    "birthdate": row.patient_birthdate,
+                }
+                if row.patient_person_id
+                else None,
+            }
+
+            enriched_orders.append(order_dict)
+
+        # Calculate pagination metadata
+        page = (skip // limit) + 1 if limit > 0 else 1
+        pages = (total + limit - 1) // limit if limit > 0 else 1
+        has_next = skip + limit < total
+        has_prev = skip > 0
+
+        return {
+            "data": enriched_orders,
+            "meta": {
+                "total": total,
+                "page": page,
+                "per_page": limit,
+                "pages": pages,
+                "has_next": has_next,
+                "has_prev": has_prev,
+            },
+        }
 
     def get_orders_by_visit_id(
         self, db: Session, visit_id: int, skip: int = 0, limit: int = 100

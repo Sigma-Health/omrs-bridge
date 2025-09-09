@@ -31,6 +31,16 @@ class OrdererInfo(BaseModel):
     birthdate: Optional[datetime] = None
 
 
+class ConceptInfo(BaseModel):
+    """Schema for concept information"""
+
+    concept_id: int
+    uuid: str
+    short_name: Optional[str] = None
+    description: Optional[str] = None
+    is_set: Optional[bool] = None
+
+
 class OrderBase(BaseModel):
     """Base schema for order data"""
 
@@ -93,6 +103,7 @@ class OrderResponse(OrderBase):
     creator_info: Optional[PersonInfo] = None
     patient_info: Optional[PersonInfo] = None
     orderer_info: Optional[OrdererInfo] = None
+    concept_info: Optional[ConceptInfo] = None
 
     class Config:
         from_attributes = True
