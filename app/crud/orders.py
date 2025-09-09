@@ -625,7 +625,15 @@ class OrdersCRUD(BaseCRUD[Order]):
         Returns:
             List of orders with concept details
         """
-        from app.models import Encounter, Visit, Person, PersonName, Provider, Concept
+        from app.models import (
+            Encounter,
+            Visit,
+            Person,
+            PersonName,
+            Provider,
+            Concept,
+            ConceptName,
+        )
         from sqlalchemy.orm import aliased
 
         # Create aliases for Person and PersonName tables to join them multiple times
@@ -676,6 +684,12 @@ class OrdersCRUD(BaseCRUD[Order]):
                 Concept.short_name.label("concept_short_name"),
                 Concept.description.label("concept_description"),
                 Concept.is_set.label("concept_is_set"),
+                # Concept name information
+                ConceptName.concept_name_id.label("concept_name_id"),
+                ConceptName.name.label("concept_name"),
+                ConceptName.locale.label("concept_name_locale"),
+                ConceptName.locale_preferred.label("concept_name_locale_preferred"),
+                ConceptName.concept_name_type.label("concept_name_type"),
             )
             .join(Encounter, Order.encounter_id == Encounter.encounter_id)
             .join(Visit, Encounter.visit_id == Visit.visit_id)
@@ -724,6 +738,15 @@ class OrdersCRUD(BaseCRUD[Order]):
                 and_(
                     Concept.concept_id == Order.concept_id,
                     Concept.retired == False,  # noqa: E712
+                ),
+            )
+            # Join for concept name information (preferred locale)
+            .outerjoin(
+                ConceptName,
+                and_(
+                    ConceptName.concept_id == Concept.concept_id,
+                    ConceptName.locale_preferred == True,  # noqa: E712
+                    ConceptName.voided == False,  # noqa: E712
                 ),
             )
             .filter(
@@ -848,6 +871,10 @@ class OrdersCRUD(BaseCRUD[Order]):
                     "short_name": row.concept_short_name,
                     "description": row.concept_description,
                     "is_set": row.concept_is_set,
+                    "name": row.concept_name,
+                    "name_locale": row.concept_name_locale,
+                    "name_locale_preferred": row.concept_name_locale_preferred,
+                    "name_type": row.concept_name_type,
                 }
                 if row.concept_id
                 else None,

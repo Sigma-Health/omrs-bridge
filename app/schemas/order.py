@@ -39,6 +39,10 @@ class ConceptInfo(BaseModel):
     short_name: Optional[str] = None
     description: Optional[str] = None
     is_set: Optional[bool] = None
+    name: Optional[str] = None
+    name_locale: Optional[str] = None
+    name_locale_preferred: Optional[bool] = None
+    name_type: Optional[str] = None
 
 
 class OrderBase(BaseModel):
