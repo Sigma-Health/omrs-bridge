@@ -372,6 +372,116 @@ async def get_order_by_number(
     return order
 
 
+@router.get(
+    "/order-concept-details",
+    response_model=OrderConceptDetailsResponse,
+    summary="Get comprehensive order and concept details",
+    description="""
+    Get detailed information about an order and its associated concept, 
+    including orderer info, patient info, concept details, answers, and set members
+    """,
+    tags=["orders"],
+)
+async def get_order_and_concept_details(
+    order_uuid: str = Query(
+        ...,
+        description="Order UUID",
+        example="7683e916-f048-49bf-b9dc-3f218bba22f6",
+    ),
+    concept_uuid: str = Query(
+        ...,
+        description="Concept UUID",
+        example="1643AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    ),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Get comprehensive order and concept details by UUIDs.
+
+    This endpoint provides:
+    - Complete order information
+    - Orderer details (provider + person info)
+    - Patient details (person info)
+    - Comprehensive concept details including:
+      - Concept metadata (id, uuid, name, description, short_name)
+      - Datatype information
+      - Concept class information
+      - Concept answers (if any)
+      - Set members (if concept is a set) with their metadata
+    """
+    logger.info(
+        f"API: Getting order and concept details for order_uuid={order_uuid}, concept_uuid={concept_uuid}"
+    )
+    try:
+        # Validate UUID formats
+        logger.info("Validating UUID formats")
+        if not validate_uuid(order_uuid):
+            logger.error(f"Invalid order UUID format: {order_uuid}")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid order UUID format",
+            )
+
+        if not validate_uuid(concept_uuid):
+            logger.error(f"Invalid concept UUID format: {concept_uuid}")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid concept UUID format",
+            )
+
+        logger.info("UUID validation passed, calling CRUD method")
+
+        # Get comprehensive order and concept details
+        logger.info("Calling CRUD method get_order_and_concept_details_by_uuids")
+        order_concept_details = orders.get_order_and_concept_details_by_uuids(
+            db,
+            order_uuid=order_uuid,
+            concept_uuid=concept_uuid,
+        )
+
+        if not order_concept_details:
+            logger.warning(
+                f"CRUD method returned None for order_uuid={order_uuid}, concept_uuid={concept_uuid}"
+            )
+            raise HTTPException(
+                status_code=404,
+                detail="Order or concept not found",
+            )
+
+        logger.info(
+            f"CRUD method returned data with {len(order_concept_details)} fields"
+        )
+        logger.info(f"Response keys: {list(order_concept_details.keys())}")
+
+        # Try to serialize the response to check for validation issues
+        try:
+            from app.schemas import OrderConceptDetailsResponse
+
+            # This will validate the response structure
+            validated_response = OrderConceptDetailsResponse(**order_concept_details)
+            logger.info("Response validation successful")
+            return validated_response.dict()
+        except Exception as validation_error:
+            logger.error(f"Response validation failed: {validation_error}")
+            logger.error(f"Response data: {order_concept_details}")
+            raise HTTPException(
+                status_code=422,
+                detail=f"Response validation failed: {str(validation_error)}",
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error getting order and concept details for order_uuid={order_uuid}, concept_uuid={concept_uuid}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get order and concept details: {str(e)}",
+        )
+
+
 @router.get("/{order_id}", response_model=OrderResponse)
 async def get_order(
     order_id: int,
@@ -834,114 +944,4 @@ async def get_orders_by_visit_uuid(
         raise HTTPException(
             status_code=400,
             detail=f"Failed to get orders: {str(e)}",
-        )
-
-
-@router.get(
-    "/order-concept-details",
-    response_model=OrderConceptDetailsResponse,
-    summary="Get comprehensive order and concept details",
-    description="""
-    Get detailed information about an order and its associated concept, 
-    including orderer info, patient info, concept details, answers, and set members
-    """,
-    tags=["orders"],
-)
-async def get_order_and_concept_details(
-    order_uuid: str = Query(
-        ...,
-        description="Order UUID",
-        example="7683e916-f048-49bf-b9dc-3f218bba22f6",
-    ),
-    concept_uuid: str = Query(
-        ...,
-        description="Concept UUID",
-        example="1643AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-    ),
-    db: Session = Depends(get_db),
-    api_key: str = Depends(get_current_api_key),
-):
-    """
-    Get comprehensive order and concept details by UUIDs.
-
-    This endpoint provides:
-    - Complete order information
-    - Orderer details (provider + person info)
-    - Patient details (person info)
-    - Comprehensive concept details including:
-      - Concept metadata (id, uuid, name, description, short_name)
-      - Datatype information
-      - Concept class information
-      - Concept answers (if any)
-      - Set members (if concept is a set) with their metadata
-    """
-    logger.info(
-        f"API: Getting order and concept details for order_uuid={order_uuid}, concept_uuid={concept_uuid}"
-    )
-    try:
-        # Validate UUID formats
-        logger.info("Validating UUID formats")
-        if not validate_uuid(order_uuid):
-            logger.error(f"Invalid order UUID format: {order_uuid}")
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid order UUID format",
-            )
-
-        if not validate_uuid(concept_uuid):
-            logger.error(f"Invalid concept UUID format: {concept_uuid}")
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid concept UUID format",
-            )
-
-        logger.info("UUID validation passed, calling CRUD method")
-
-        # Get comprehensive order and concept details
-        logger.info("Calling CRUD method get_order_and_concept_details_by_uuids")
-        order_concept_details = orders.get_order_and_concept_details_by_uuids(
-            db,
-            order_uuid=order_uuid,
-            concept_uuid=concept_uuid,
-        )
-
-        if not order_concept_details:
-            logger.warning(
-                f"CRUD method returned None for order_uuid={order_uuid}, concept_uuid={concept_uuid}"
-            )
-            raise HTTPException(
-                status_code=404,
-                detail="Order or concept not found",
-            )
-
-        logger.info(
-            f"CRUD method returned data with {len(order_concept_details)} fields"
-        )
-        logger.info(f"Response keys: {list(order_concept_details.keys())}")
-
-        # Try to serialize the response to check for validation issues
-        try:
-            from app.schemas import OrderConceptDetailsResponse
-
-            # This will validate the response structure
-            validated_response = OrderConceptDetailsResponse(**order_concept_details)
-            logger.info("Response validation successful")
-            return validated_response.dict()
-        except Exception as validation_error:
-            logger.error(f"Response validation failed: {validation_error}")
-            logger.error(f"Response data: {order_concept_details}")
-            raise HTTPException(
-                status_code=422,
-                detail=f"Response validation failed: {str(validation_error)}",
-            )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            f"Error getting order and concept details for order_uuid={order_uuid}, concept_uuid={concept_uuid}: {str(e)}"
-        )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get order and concept details: {str(e)}",
         )
