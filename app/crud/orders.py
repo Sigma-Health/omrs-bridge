@@ -613,7 +613,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
         """
-        Get orders by order type and visit UUID with concept details.
+        Get orders by order type and visit UUID.
 
         Args:
             db: Database session
@@ -1364,6 +1364,495 @@ class OrdersCRUD(BaseCRUD[Order]):
             "gender": person.gender,
             "birthdate": person.birthdate,
         }
+
+    def get_order_and_concept_details_by_uuids(
+        self,
+        db: Session,
+        order_uuid: str,
+        concept_uuid: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get comprehensive order and concept details by UUIDs.
+
+        Args:
+            db: Database session
+            order_uuid: Order UUID
+            concept_uuid: Concept UUID
+
+        Returns:
+            Dictionary containing order details, orderer info, patient info,
+            and comprehensive concept details including set members and answers
+        """
+        from app.models import (
+            Person,
+            PersonName,
+            Provider,
+        )
+        from sqlalchemy.orm import aliased
+
+        # Create aliases for Person and PersonName tables
+        OrdererPerson = aliased(Person)
+        OrdererPersonName = aliased(PersonName)
+        PatientPerson = aliased(Person)
+        PatientPersonName = aliased(PersonName)
+
+        # Main query to get order with enriched orderer and patient info
+        query = (
+            db.query(
+                Order,
+                # Provider information
+                Provider.provider_id.label("provider_id"),
+                Provider.name.label("provider_name"),
+                Provider.identifier.label("provider_identifier"),
+                Provider.uuid.label("provider_uuid"),
+                # Orderer person information
+                OrdererPerson.person_id.label("orderer_person_id"),
+                OrdererPerson.uuid.label("orderer_person_uuid"),
+                OrdererPerson.gender.label("orderer_gender"),
+                OrdererPerson.birthdate.label("orderer_birthdate"),
+                # Orderer person name information
+                OrdererPersonName.given_name.label("orderer_given_name"),
+                OrdererPersonName.middle_name.label("orderer_middle_name"),
+                OrdererPersonName.family_name.label("orderer_family_name"),
+                OrdererPersonName.family_name2.label("orderer_family_name2"),
+                OrdererPersonName.family_name_suffix.label(
+                    "orderer_family_name_suffix"
+                ),
+                # Patient person information
+                PatientPerson.person_id.label("patient_person_id"),
+                PatientPerson.uuid.label("patient_person_uuid"),
+                PatientPerson.gender.label("patient_gender"),
+                PatientPerson.birthdate.label("patient_birthdate"),
+                # Patient person name information
+                PatientPersonName.given_name.label("patient_given_name"),
+                PatientPersonName.middle_name.label("patient_middle_name"),
+                PatientPersonName.family_name.label("patient_family_name"),
+                PatientPersonName.family_name2.label("patient_family_name2"),
+                PatientPersonName.family_name_suffix.label(
+                    "patient_family_name_suffix"
+                ),
+            )
+            .outerjoin(Provider, Order.orderer == Provider.provider_id)
+            .outerjoin(OrdererPerson, Provider.person_id == OrdererPerson.person_id)
+            .outerjoin(
+                OrdererPersonName,
+                and_(
+                    OrdererPersonName.person_id == OrdererPerson.person_id,
+                    OrdererPersonName.preferred,
+                    not OrdererPersonName.voided,
+                ),
+            )
+            .outerjoin(PatientPerson, Order.patient_id == PatientPerson.person_id)
+            .outerjoin(
+                PatientPersonName,
+                and_(
+                    PatientPersonName.person_id == PatientPerson.person_id,
+                    PatientPersonName.preferred,
+                    not PatientPersonName.voided,
+                ),
+            )
+            .filter(Order.uuid == order_uuid)
+            .filter(not Order.voided)
+        )
+
+        result = query.first()
+        if not result:
+            return None
+
+        order = result[0]
+
+        # Build orderer info
+        orderer_info = None
+        if result.provider_id:
+            orderer_name_parts = []
+            if result.orderer_given_name:
+                orderer_name_parts.append(result.orderer_given_name)
+            if result.orderer_middle_name:
+                orderer_name_parts.append(result.orderer_middle_name)
+            if result.orderer_family_name:
+                orderer_name_parts.append(result.orderer_family_name)
+            if result.orderer_family_name2:
+                orderer_name_parts.append(result.orderer_family_name2)
+            if result.orderer_family_name_suffix:
+                orderer_name_parts.append(result.orderer_family_name_suffix)
+
+            orderer_name = " ".join(orderer_name_parts) if orderer_name_parts else None
+
+            orderer_info = {
+                "person_id": result.orderer_person_id,
+                "uuid": result.orderer_person_uuid,
+                "name": orderer_name,
+                "gender": result.orderer_gender,
+                "birthdate": result.orderer_birthdate,
+                "provider_id": result.provider_id,
+                "provider_name": result.provider_name,
+                "provider_identifier": result.provider_identifier,
+                "provider_uuid": result.provider_uuid,
+            }
+
+        # Build patient info
+        patient_info = None
+        if result.patient_person_id:
+            patient_name_parts = []
+            if result.patient_given_name:
+                patient_name_parts.append(result.patient_given_name)
+            if result.patient_middle_name:
+                patient_name_parts.append(result.patient_middle_name)
+            if result.patient_family_name:
+                patient_name_parts.append(result.patient_family_name)
+            if result.patient_family_name2:
+                patient_name_parts.append(result.patient_family_name2)
+            if result.patient_family_name_suffix:
+                patient_name_parts.append(result.patient_family_name_suffix)
+
+            patient_name = " ".join(patient_name_parts) if patient_name_parts else None
+
+            patient_info = {
+                "person_id": result.patient_person_id,
+                "uuid": result.patient_person_uuid,
+                "name": patient_name,
+                "gender": result.patient_gender,
+                "birthdate": result.patient_birthdate,
+            }
+
+        # Get comprehensive concept details
+        concept_details = self._get_comprehensive_concept_details(db, concept_uuid)
+
+        # Build the complete response
+        order_dict = {
+            "order_id": order.order_id,
+            "order_type_id": order.order_type_id,
+            "concept_id": order.concept_id,
+            "orderer": order.orderer,
+            "encounter_id": order.encounter_id,
+            "instructions": order.instructions,
+            "date_activated": order.date_activated,
+            "auto_expire_date": order.auto_expire_date,
+            "date_stopped": order.date_stopped,
+            "order_reason": order.order_reason,
+            "order_reason_non_coded": order.order_reason_non_coded,
+            "voided": order.voided,
+            "voided_by": order.voided_by,
+            "date_voided": order.date_voided,
+            "void_reason": order.void_reason,
+            "patient_id": order.patient_id,
+            "accession_number": order.accession_number,
+            "urgency": order.urgency,
+            "order_number": order.order_number,
+            "previous_order_id": order.previous_order_id,
+            "order_action": order.order_action,
+            "comment_to_fulfiller": order.comment_to_fulfiller,
+            "care_setting": order.care_setting,
+            "scheduled_date": order.scheduled_date,
+            "order_group_id": order.order_group_id,
+            "sort_weight": order.sort_weight,
+            "fulfiller_comment": order.fulfiller_comment,
+            "fulfiller_status": order.fulfiller_status,
+            "form_namespace_and_path": order.form_namespace_and_path,
+            "creator": order.creator,
+            "date_created": order.date_created,
+            "uuid": order.uuid,
+            "orderer_info": orderer_info,
+            "patient_info": patient_info,
+            "concept_details": concept_details,
+        }
+
+        return order_dict
+
+    def _get_comprehensive_concept_details(
+        self, db: Session, concept_uuid: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get comprehensive concept details including datatype, class, answers, and set members.
+
+        Args:
+            db: Database session
+            concept_uuid: Concept UUID
+
+        Returns:
+            Dictionary containing comprehensive concept information
+        """
+        from app.models import (
+            Concept,
+            ConceptName,
+            ConceptDatatype,
+            ConceptClass,
+        )
+
+        # Get main concept with datatype and class information
+        concept_query = (
+            db.query(
+                Concept,
+                ConceptDatatype.concept_datatype_id.label("datatype_id"),
+                ConceptDatatype.name.label("datatype_name"),
+                ConceptDatatype.hl7_abbreviation.label("datatype_hl7_abbreviation"),
+                ConceptDatatype.description.label("datatype_description"),
+                ConceptDatatype.uuid.label("datatype_uuid"),
+                ConceptClass.concept_class_id.label("class_id"),
+                ConceptClass.name.label("class_name"),
+                ConceptClass.description.label("class_description"),
+                ConceptClass.uuid.label("class_uuid"),
+                ConceptName.name.label("concept_name"),
+                ConceptName.locale.label("concept_name_locale"),
+                ConceptName.locale_preferred.label("concept_name_locale_preferred"),
+                ConceptName.concept_name_type.label("concept_name_type"),
+            )
+            .outerjoin(
+                ConceptDatatype,
+                Concept.datatype_id == ConceptDatatype.concept_datatype_id,
+            )
+            .outerjoin(ConceptClass, Concept.class_id == ConceptClass.concept_class_id)
+            .outerjoin(
+                ConceptName,
+                and_(
+                    ConceptName.concept_id == Concept.concept_id,
+                    ConceptName.locale == "en",
+                    ConceptName.concept_name_type == "FULLY_SPECIFIED",
+                    not ConceptName.voided,
+                ),
+            )
+            .filter(Concept.uuid == concept_uuid)
+            .filter(not Concept.retired)
+        )
+
+        concept_result = concept_query.first()
+        if not concept_result:
+            return None
+
+        concept = concept_result[0]
+
+        # Build datatype info
+        datatype_info = None
+        if concept_result.datatype_id:
+            datatype_info = {
+                "concept_datatype_id": concept_result.datatype_id,
+                "name": concept_result.datatype_name,
+                "hl7_abbreviation": concept_result.datatype_hl7_abbreviation,
+                "description": concept_result.datatype_description,
+                "uuid": concept_result.datatype_uuid,
+            }
+
+        # Build class info
+        class_info = None
+        if concept_result.class_id:
+            class_info = {
+                "concept_class_id": concept_result.class_id,
+                "name": concept_result.class_name,
+                "description": concept_result.class_description,
+                "uuid": concept_result.class_uuid,
+            }
+
+        # Get concept answers if any
+        answers = self._get_concept_answers(db, concept.concept_id)
+
+        # Get set members if concept is a set
+        set_members = None
+        if concept.is_set:
+            set_members = self._get_concept_set_members(db, concept.concept_id)
+
+        return {
+            "concept_id": concept.concept_id,
+            "uuid": concept.uuid,
+            "name": concept_result.concept_name,
+            "description": concept.description,
+            "short_name": concept.short_name,
+            "datatype": datatype_info,
+            "concept_class": class_info,
+            "is_set": concept.is_set,
+            "answers": answers,
+            "set_members": set_members,
+        }
+
+    def _get_concept_answers(
+        self, db: Session, concept_id: int
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Get concept answers with their details.
+
+        Args:
+            db: Database session
+            concept_id: Concept ID
+
+        Returns:
+            List of concept answer dictionaries
+        """
+        from app.models import (
+            ConceptAnswer,
+            Concept,
+            ConceptName,
+            ConceptDatatype,
+            ConceptClass,
+        )
+
+        answers_query = (
+            db.query(
+                ConceptAnswer.answer_concept.label("answer_concept_id"),
+                Concept.uuid.label("answer_uuid"),
+                ConceptName.name.label("answer_name"),
+                Concept.description.label("answer_description"),
+                ConceptDatatype.concept_datatype_id.label("answer_datatype_id"),
+                ConceptDatatype.name.label("answer_datatype_name"),
+                ConceptDatatype.hl7_abbreviation.label(
+                    "answer_datatype_hl7_abbreviation"
+                ),
+                ConceptDatatype.description.label("answer_datatype_description"),
+                ConceptDatatype.uuid.label("answer_datatype_uuid"),
+                ConceptClass.concept_class_id.label("answer_class_id"),
+                ConceptClass.name.label("answer_class_name"),
+                ConceptClass.description.label("answer_class_description"),
+                ConceptClass.uuid.label("answer_class_uuid"),
+            )
+            .join(Concept, ConceptAnswer.answer_concept == Concept.concept_id)
+            .outerjoin(
+                ConceptName,
+                and_(
+                    ConceptName.concept_id == Concept.concept_id,
+                    ConceptName.locale == "en",
+                    ConceptName.concept_name_type == "FULLY_SPECIFIED",
+                    not ConceptName.voided,
+                ),
+            )
+            .outerjoin(
+                ConceptDatatype,
+                Concept.datatype_id == ConceptDatatype.concept_datatype_id,
+            )
+            .outerjoin(ConceptClass, Concept.class_id == ConceptClass.concept_class_id)
+            .filter(ConceptAnswer.concept_id == concept_id)
+            .filter(not Concept.retired)
+        )
+
+        answers = []
+        for result in answers_query.all():
+            answer_datatype = None
+            if result.answer_datatype_id:
+                answer_datatype = {
+                    "concept_datatype_id": result.answer_datatype_id,
+                    "name": result.answer_datatype_name,
+                    "hl7_abbreviation": result.answer_datatype_hl7_abbreviation,
+                    "description": result.answer_datatype_description,
+                    "uuid": result.answer_datatype_uuid,
+                }
+
+            answer_class = None
+            if result.answer_class_id:
+                answer_class = {
+                    "concept_class_id": result.answer_class_id,
+                    "name": result.answer_class_name,
+                    "description": result.answer_class_description,
+                    "uuid": result.answer_class_uuid,
+                }
+
+            answers.append(
+                {
+                    "concept_id": result.answer_concept_id,
+                    "uuid": result.answer_uuid,
+                    "name": result.answer_name,
+                    "description": result.answer_description,
+                    "datatype": answer_datatype,
+                    "concept_class": answer_class,
+                }
+            )
+
+        return answers if answers else None
+
+    def _get_concept_set_members(
+        self, db: Session, concept_id: int
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Get concept set members with their details.
+
+        Args:
+            db: Database session
+            concept_id: Concept ID
+
+        Returns:
+            List of concept set member dictionaries
+        """
+        from app.models import (
+            ConceptSet,
+            Concept,
+            ConceptName,
+            ConceptDatatype,
+            ConceptClass,
+        )
+
+        set_members_query = (
+            db.query(
+                ConceptSet.concept_set.label("member_concept_id"),
+                Concept.uuid.label("member_uuid"),
+                ConceptName.name.label("member_name"),
+                Concept.description.label("member_description"),
+                ConceptDatatype.concept_datatype_id.label("member_datatype_id"),
+                ConceptDatatype.name.label("member_datatype_name"),
+                ConceptDatatype.hl7_abbreviation.label(
+                    "member_datatype_hl7_abbreviation"
+                ),
+                ConceptDatatype.description.label("member_datatype_description"),
+                ConceptDatatype.uuid.label("member_datatype_uuid"),
+                ConceptClass.concept_class_id.label("member_class_id"),
+                ConceptClass.name.label("member_class_name"),
+                ConceptClass.description.label("member_class_description"),
+                ConceptClass.uuid.label("member_class_uuid"),
+                ConceptSet.sort_weight.label("member_sort_weight"),
+            )
+            .join(Concept, ConceptSet.concept_set == Concept.concept_id)
+            .outerjoin(
+                ConceptName,
+                and_(
+                    ConceptName.concept_id == Concept.concept_id,
+                    ConceptName.locale == "en",
+                    ConceptName.concept_name_type == "FULLY_SPECIFIED",
+                    not ConceptName.voided,
+                ),
+            )
+            .outerjoin(
+                ConceptDatatype,
+                Concept.datatype_id == ConceptDatatype.concept_datatype_id,
+            )
+            .outerjoin(ConceptClass, Concept.class_id == ConceptClass.concept_class_id)
+            .filter(ConceptSet.concept_id == concept_id)
+            .filter(not Concept.retired)
+            .order_by(ConceptSet.sort_weight)
+        )
+
+        set_members = []
+        for result in set_members_query.all():
+            member_datatype = None
+            if result.member_datatype_id:
+                member_datatype = {
+                    "concept_datatype_id": result.member_datatype_id,
+                    "name": result.member_datatype_name,
+                    "hl7_abbreviation": result.member_datatype_hl7_abbreviation,
+                    "description": result.member_datatype_description,
+                    "uuid": result.member_datatype_uuid,
+                }
+
+            member_class = None
+            if result.member_class_id:
+                member_class = {
+                    "concept_class_id": result.member_class_id,
+                    "name": result.member_class_name,
+                    "description": result.member_class_description,
+                    "uuid": result.member_class_uuid,
+                }
+
+            # Get answers for this set member
+            member_answers = self._get_concept_answers(db, result.member_concept_id)
+
+            set_members.append(
+                {
+                    "concept_id": result.member_concept_id,
+                    "uuid": result.member_uuid,
+                    "name": result.member_name,
+                    "description": result.member_description,
+                    "datatype": member_datatype,
+                    "concept_class": member_class,
+                    "answers": member_answers,
+                    "sort_weight": result.member_sort_weight,
+                }
+            )
+
+        return set_members if set_members else None
 
 
 # Create instance
