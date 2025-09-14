@@ -34,6 +34,63 @@ class ConceptName(Base):
     changed_by = Column(Integer, nullable=True)
 
 
+class ConceptAnswer(Base):
+    __tablename__ = "concept_answer"
+
+    concept_answer_id = Column(Integer, primary_key=True, index=True)
+    concept_id = Column(Integer, nullable=False, index=True)
+    answer_concept = Column(Integer, nullable=False, index=True)
+    creator = Column(Integer)
+    date_created = Column(DateTime, default=func.now())
+    uuid = Column(String(38), unique=True, index=True)
+    sort_weight = Column(Integer, nullable=True)
+
+
+class ConceptClass(Base):
+    __tablename__ = "concept_class"
+
+    concept_class_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    creator = Column(Integer)
+    date_created = Column(DateTime, default=func.now())
+    retired = Column(Boolean, default=False)
+    retired_by = Column(Integer, nullable=True)
+    date_retired = Column(DateTime, nullable=True)
+    retire_reason = Column(Text, nullable=True)
+    uuid = Column(String(38), unique=True, index=True)
+    changed_by = Column(Integer, nullable=True)
+    date_changed = Column(DateTime, nullable=True)
+
+
+class ConceptDatatype(Base):
+    __tablename__ = "concept_datatype"
+
+    concept_datatype_id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    hl7_abbreviation = Column(String(3), nullable=True)
+    description = Column(Text, nullable=True)
+    creator = Column(Integer)
+    date_created = Column(DateTime, default=func.now())
+    retired = Column(Boolean, default=False)
+    retired_by = Column(Integer, nullable=True)
+    date_retired = Column(DateTime, nullable=True)
+    retire_reason = Column(Text, nullable=True)
+    uuid = Column(String(38), unique=True, index=True)
+
+
+class ConceptSet(Base):
+    __tablename__ = "concept_set"
+
+    concept_set_id = Column(Integer, primary_key=True, index=True)
+    concept_id = Column(Integer, nullable=False, index=True)
+    concept_set = Column(Integer, nullable=False, index=True)
+    sort_weight = Column(Integer, nullable=True)
+    creator = Column(Integer)
+    date_created = Column(DateTime, default=func.now())
+    uuid = Column(String(38), unique=True, index=True)
+
+
 class Concept(Base):
     __tablename__ = "concept"
 
