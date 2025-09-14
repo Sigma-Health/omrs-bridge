@@ -875,21 +875,30 @@ async def get_order_and_concept_details(
       - Concept answers (if any)
       - Set members (if concept is a set) with their metadata
     """
+    logger.info(
+        f"API: Getting order and concept details for order_uuid={order_uuid}, concept_uuid={concept_uuid}"
+    )
     try:
         # Validate UUID formats
+        logger.info("Validating UUID formats")
         if not validate_uuid(order_uuid):
+            logger.error(f"Invalid order UUID format: {order_uuid}")
             raise HTTPException(
                 status_code=400,
                 detail="Invalid order UUID format",
             )
 
         if not validate_uuid(concept_uuid):
+            logger.error(f"Invalid concept UUID format: {concept_uuid}")
             raise HTTPException(
                 status_code=400,
                 detail="Invalid concept UUID format",
             )
 
+        logger.info("UUID validation passed, calling CRUD method")
+
         # Get comprehensive order and concept details
+        logger.info("Calling CRUD method get_order_and_concept_details_by_uuids")
         order_concept_details = orders.get_order_and_concept_details_by_uuids(
             db,
             order_uuid=order_uuid,
@@ -897,12 +906,34 @@ async def get_order_and_concept_details(
         )
 
         if not order_concept_details:
+            logger.warning(
+                f"CRUD method returned None for order_uuid={order_uuid}, concept_uuid={concept_uuid}"
+            )
             raise HTTPException(
                 status_code=404,
                 detail="Order or concept not found",
             )
 
-        return order_concept_details
+        logger.info(
+            f"CRUD method returned data with {len(order_concept_details)} fields"
+        )
+        logger.info(f"Response keys: {list(order_concept_details.keys())}")
+
+        # Try to serialize the response to check for validation issues
+        try:
+            from app.schemas import OrderConceptDetailsResponse
+
+            # This will validate the response structure
+            validated_response = OrderConceptDetailsResponse(**order_concept_details)
+            logger.info("Response validation successful")
+            return validated_response.dict()
+        except Exception as validation_error:
+            logger.error(f"Response validation failed: {validation_error}")
+            logger.error(f"Response data: {order_concept_details}")
+            raise HTTPException(
+                status_code=422,
+                detail=f"Response validation failed: {str(validation_error)}",
+            )
 
     except HTTPException:
         raise

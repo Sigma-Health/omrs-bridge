@@ -1383,6 +1383,14 @@ class OrdersCRUD(BaseCRUD[Order]):
             Dictionary containing order details, orderer info, patient info,
             and comprehensive concept details including set members and answers
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        logger.info(
+            f"Starting get_order_and_concept_details_by_uuids with order_uuid={order_uuid}, concept_uuid={concept_uuid}"
+        )
+
         from app.models import (
             Person,
             PersonName,
@@ -1455,10 +1463,15 @@ class OrdersCRUD(BaseCRUD[Order]):
             .filter(not Order.voided)
         )
 
+        logger.info(f"Executing main order query for order_uuid={order_uuid}")
         result = query.first()
         if not result:
+            logger.warning(f"No order found for order_uuid={order_uuid}")
             return None
 
+        logger.info(
+            f"Found order: ID={result[0].order_id}, concept_id={result[0].concept_id}"
+        )
         order = result[0]
 
         # Build orderer info
@@ -1516,7 +1529,16 @@ class OrdersCRUD(BaseCRUD[Order]):
             }
 
         # Get comprehensive concept details
+        logger.info(
+            f"Getting comprehensive concept details for concept_uuid={concept_uuid}"
+        )
         concept_details = self._get_comprehensive_concept_details(db, concept_uuid)
+        if concept_details:
+            logger.info(
+                f"Found concept details: concept_id={concept_details.get('concept_id')}, name={concept_details.get('name')}"
+            )
+        else:
+            logger.warning(f"No concept details found for concept_uuid={concept_uuid}")
 
         # Build the complete response
         order_dict = {
@@ -1557,6 +1579,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             "concept_details": concept_details,
         }
 
+        logger.info(f"Successfully built order_dict with {len(order_dict)} fields")
         return order_dict
 
     def _get_comprehensive_concept_details(
@@ -1572,6 +1595,13 @@ class OrdersCRUD(BaseCRUD[Order]):
         Returns:
             Dictionary containing comprehensive concept information
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        logger.info(
+            f"Getting comprehensive concept details for concept_uuid={concept_uuid}"
+        )
         from app.models import (
             Concept,
             ConceptName,
@@ -1615,10 +1645,15 @@ class OrdersCRUD(BaseCRUD[Order]):
             .filter(not Concept.retired)
         )
 
+        logger.info(f"Executing concept query for concept_uuid={concept_uuid}")
         concept_result = concept_query.first()
         if not concept_result:
+            logger.warning(f"No concept found for concept_uuid={concept_uuid}")
             return None
 
+        logger.info(
+            f"Found concept: ID={concept_result[0].concept_id}, is_set={concept_result[0].is_set}"
+        )
         concept = concept_result[0]
 
         # Build datatype info
@@ -1643,12 +1678,26 @@ class OrdersCRUD(BaseCRUD[Order]):
             }
 
         # Get concept answers if any
-        answers = self._get_concept_answers(db, concept.concept_id)
+        logger.info(f"Getting concept answers for concept_id={concept.concept_id}")
+        try:
+            answers = self._get_concept_answers(db, concept.concept_id)
+            logger.info(f"Found {len(answers) if answers else 0} concept answers")
+        except Exception as e:
+            logger.error(f"Error getting concept answers: {e}")
+            answers = None
 
         # Get set members if concept is a set
         set_members = None
         if concept.is_set:
-            set_members = self._get_concept_set_members(db, concept.concept_id)
+            logger.info(f"Getting set members for concept_id={concept.concept_id}")
+            try:
+                set_members = self._get_concept_set_members(db, concept.concept_id)
+                logger.info(
+                    f"Found {len(set_members) if set_members else 0} set members"
+                )
+            except Exception as e:
+                logger.error(f"Error getting set members: {e}")
+                set_members = None
 
         return {
             "concept_id": concept.concept_id,
