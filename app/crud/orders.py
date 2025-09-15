@@ -1399,7 +1399,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             Provider,
         )
         from sqlalchemy.orm import aliased
-        from sqlalchemy import func
+        from sqlalchemy import func, and_
 
         # Create aliases for Person and PersonName tables
         OrdererPerson = aliased(Person)
@@ -1449,8 +1449,8 @@ class OrdersCRUD(BaseCRUD[Order]):
                 OrdererPersonName,
                 and_(
                     OrdererPersonName.person_id == OrdererPerson.person_id,
-                    OrdererPersonName.preferred,
-                    not OrdererPersonName.voided,
+                    OrdererPersonName.preferred == True,
+                    OrdererPersonName.voided == False,
                 ),
             )
             .outerjoin(PatientPerson, Order.patient_id == PatientPerson.person_id)
@@ -1458,12 +1458,12 @@ class OrdersCRUD(BaseCRUD[Order]):
                 PatientPersonName,
                 and_(
                     PatientPersonName.person_id == PatientPerson.person_id,
-                    PatientPersonName.preferred,
-                    not PatientPersonName.voided,
+                    PatientPersonName.preferred == True,
+                    PatientPersonName.voided == False,
                 ),
             )
             .filter(func.lower(Order.uuid) == func.lower(order_uuid))
-            .filter(not Order.voided)
+            .filter(Order.voided == False)
         )
 
         logger.info(f"Executing main order query for order_uuid={order_uuid}")
@@ -1612,7 +1612,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             ConceptDatatype,
             ConceptClass,
         )
-        from sqlalchemy import func
+        from sqlalchemy import func, and_
 
         # Get main concept with datatype and class information
         concept_query = (
@@ -1643,11 +1643,11 @@ class OrdersCRUD(BaseCRUD[Order]):
                     ConceptName.concept_id == Concept.concept_id,
                     ConceptName.locale == "en",
                     ConceptName.concept_name_type == "FULLY_SPECIFIED",
-                    not ConceptName.voided,
+                    ConceptName.voided == False,
                 ),
             )
             .filter(func.lower(Concept.uuid) == func.lower(concept_uuid))
-            .filter(not Concept.retired)
+            .filter(Concept.retired == False)
         )
 
         logger.info(f"Executing concept query for concept_uuid={concept_uuid}")
@@ -1738,6 +1738,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             ConceptDatatype,
             ConceptClass,
         )
+        from sqlalchemy import func, and_
 
         answers_query = (
             db.query(
@@ -1764,7 +1765,7 @@ class OrdersCRUD(BaseCRUD[Order]):
                     ConceptName.concept_id == Concept.concept_id,
                     ConceptName.locale == "en",
                     ConceptName.concept_name_type == "FULLY_SPECIFIED",
-                    not ConceptName.voided,
+                    ConceptName.voided == False,
                 ),
             )
             .outerjoin(
@@ -1773,7 +1774,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             )
             .outerjoin(ConceptClass, Concept.class_id == ConceptClass.concept_class_id)
             .filter(ConceptAnswer.concept_id == concept_id)
-            .filter(not Concept.retired)
+            .filter(Concept.retired == False)
         )
 
         answers = []
@@ -1830,6 +1831,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             ConceptDatatype,
             ConceptClass,
         )
+        from sqlalchemy import func, and_
 
         set_members_query = (
             db.query(
@@ -1857,7 +1859,7 @@ class OrdersCRUD(BaseCRUD[Order]):
                     ConceptName.concept_id == Concept.concept_id,
                     ConceptName.locale == "en",
                     ConceptName.concept_name_type == "FULLY_SPECIFIED",
-                    not ConceptName.voided,
+                    ConceptName.voided == False,
                 ),
             )
             .outerjoin(
@@ -1866,7 +1868,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             )
             .outerjoin(ConceptClass, Concept.class_id == ConceptClass.concept_class_id)
             .filter(ConceptSet.concept_id == concept_id)
-            .filter(not Concept.retired)
+            .filter(Concept.retired == False)
             .order_by(ConceptSet.sort_weight)
         )
 
