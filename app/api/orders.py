@@ -17,6 +17,7 @@ from app.schemas import (
     OrderResponse,
     OrderUpdateResponse,
     OrderConceptDetailsResponse,
+    OpenMRSOrderResponse,
 )
 from app.utils import validate_uuid
 
@@ -370,6 +371,82 @@ async def get_order_by_number(
             detail="Order not found",
         )
     return order
+
+
+@router.get(
+    "/openmrs-format",
+    response_model=OpenMRSOrderResponse,
+    summary="Get order details in OpenMRS format",
+    description="""
+    Get order and concept details formatted according to OpenMRS REST API standards,
+    including proper status mapping, panel detection, and nested concept structures
+    """,
+    tags=["orders"],
+)
+async def get_order_in_openmrs_format(
+    order_uuid: str = Query(
+        ...,
+        description="Order UUID",
+        example="7683e916-f048-49bf-b9dc-3f218bba22f6",
+    ),
+    concept_uuid: str = Query(
+        ...,
+        description="Concept UUID",
+        example="163700AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    ),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Get order and concept details in OpenMRS format
+    """
+    logger.info(
+        f"API: Getting order in OpenMRS format for order_uuid={order_uuid}, concept_uuid={concept_uuid}"
+    )
+
+    try:
+        # Validate UUID formats
+        logger.info("Validating UUID formats")
+        if not validate_uuid(order_uuid):
+            logger.error(f"Invalid order UUID format: {order_uuid}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid order UUID format: {order_uuid}",
+            )
+
+        if not validate_uuid(concept_uuid):
+            logger.error(f"Invalid concept UUID format: {concept_uuid}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid concept UUID format: {concept_uuid}",
+            )
+
+        logger.info("UUID validation passed, calling CRUD method")
+        logger.info("Calling CRUD method get_order_in_openmrs_format")
+
+        # Get order and concept details in OpenMRS format
+        result = orders.get_order_in_openmrs_format(db, order_uuid, concept_uuid)
+
+        if result is None:
+            logger.warning(
+                f"CRUD method returned None for order_uuid={order_uuid}, concept_uuid={concept_uuid}"
+            )
+            raise HTTPException(
+                status_code=404,
+                detail="Order or concept not found",
+            )
+
+        logger.info("Successfully retrieved order in OpenMRS format")
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting order in OpenMRS format: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}",
+        )
 
 
 @router.get(

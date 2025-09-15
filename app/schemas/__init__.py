@@ -47,6 +47,15 @@ from .order_concept_details import (
     ConceptDatatypeInfo,
     ConceptClassInfo,
 )
+from .openmrs_order_response import (
+    OpenMRSOrderResponse,
+    ConceptInfo as OpenMRSConceptInfo,
+    SetMemberInfo,
+    ConceptAnswerInfo as OpenMRSConceptAnswerInfo,
+    ConceptDatatypeInfo as OpenMRSConceptDatatypeInfo,
+    ConceptClassInfo as OpenMRSConceptClassInfo,
+    ConceptNameInfo,
+)
 from .order_type import (
     OrderTypeBase,
     OrderTypeCreate,
@@ -109,6 +118,14 @@ __all__ = [
     "ConceptAnswerInfo",
     "ConceptDatatypeInfo",
     "ConceptClassInfo",
+    # OpenMRS Order Response
+    "OpenMRSOrderResponse",
+    "OpenMRSConceptInfo",
+    "SetMemberInfo",
+    "OpenMRSConceptAnswerInfo",
+    "OpenMRSConceptDatatypeInfo",
+    "OpenMRSConceptClassInfo",
+    "ConceptNameInfo",
     # Order Type
     "OrderTypeBase",
     "OrderTypeCreate",

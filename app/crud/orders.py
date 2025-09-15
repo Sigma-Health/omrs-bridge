@@ -1911,6 +1911,232 @@ class OrdersCRUD(BaseCRUD[Order]):
 
         return set_members if set_members else None
 
+    def get_order_in_openmrs_format(
+        self, db: Session, order_uuid: str, concept_uuid: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get order and concept details in OpenMRS format.
+
+        Args:
+            db: Database session
+            order_uuid: Order UUID
+            concept_uuid: Concept UUID
+
+        Returns:
+            Dictionary with order details in OpenMRS format
+        """
+        logger = logging.getLogger(__name__)
+
+        # Get the raw order and concept details
+        raw_data = self.get_order_and_concept_details_by_uuids(
+            db, order_uuid, concept_uuid
+        )
+        if not raw_data:
+            return None
+
+        # Transform to OpenMRS format
+        return self._transform_to_openmrs_format(raw_data)
+
+    def _transform_to_openmrs_format(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Transform raw order/concept data to OpenMRS format.
+
+        Args:
+            raw_data: Raw data from get_order_and_concept_details_by_uuids
+
+        Returns:
+            Transformed data in OpenMRS format
+        """
+        logger = logging.getLogger(__name__)
+
+        # Determine order status
+        status = self._determine_order_status(raw_data)
+
+        # Determine if it's a panel (is_set = True)
+        is_panel = raw_data.get("concept_details", {}).get("is_set", False)
+
+        # Transform concept details
+        concept_info = self._transform_concept_to_openmrs_format(
+            raw_data.get("concept_details", {})
+        )
+
+        # Transform set members if it's a panel
+        set_members = []
+        if is_panel and raw_data.get("concept_details", {}).get("set_members"):
+            set_members = self._transform_set_members_to_openmrs_format(
+                raw_data["concept_details"]["set_members"]
+            )
+
+        # Build the OpenMRS response
+        openmrs_response = {
+            "uuid": raw_data.get("uuid"),
+            "order_number": raw_data.get("order_number"),
+            "concept": concept_info,
+            "status": status,
+            "date_activated": raw_data.get("date_activated"),
+            "instructions": raw_data.get("instructions"),
+            "accession_number": raw_data.get("accession_number"),
+            "encounter_uuid": None,  # We'll need to get this from encounter table
+            "is_panel": is_panel,
+            "is_set_member": False,  # TODO: Determine this based on parent concept
+            "set_members": set_members,
+        }
+
+        return openmrs_response
+
+    def _determine_order_status(self, raw_data: Dict[str, Any]) -> str:
+        """
+        Determine order status based on order data.
+
+        Args:
+            raw_data: Raw order data
+
+        Returns:
+            Status string (ACTIVE, STOPPED, EXPIRED, etc.)
+        """
+        if raw_data.get("voided"):
+            return "VOIDED"
+        elif raw_data.get("date_stopped"):
+            return "STOPPED"
+        elif (
+            raw_data.get("auto_expire_date")
+            and raw_data.get("auto_expire_date") < datetime.now()
+        ):
+            return "EXPIRED"
+        else:
+            return "ACTIVE"
+
+    def _transform_concept_to_openmrs_format(
+        self, concept_details: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Transform concept details to OpenMRS format.
+
+        Args:
+            concept_details: Raw concept details
+
+        Returns:
+            Transformed concept info
+        """
+        # Transform datatype
+        datatype_info = None
+        if concept_details.get("datatype"):
+            datatype_info = {
+                "uuid": concept_details["datatype"]["uuid"],
+                "display": concept_details["datatype"]["name"],
+                "name": concept_details["datatype"]["name"],
+                "description": concept_details["datatype"]["description"],
+            }
+
+        # Transform concept class
+        concept_class = concept_details.get("concept_class", {}).get("name", "")
+
+        # Transform answers
+        answers = []
+        if concept_details.get("answers"):
+            answers = self._transform_answers_to_openmrs_format(
+                concept_details["answers"]
+            )
+
+        return {
+            "uuid": concept_details.get("uuid"),
+            "display": concept_details.get("name"),
+            "name": concept_details.get("name"),
+            "datatype": datatype_info,
+            "concept_class": concept_class,
+            "answers": answers,
+        }
+
+    def _transform_set_members_to_openmrs_format(
+        self, set_members: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Transform set members to OpenMRS format.
+
+        Args:
+            set_members: Raw set members data
+
+        Returns:
+            Transformed set members
+        """
+        transformed_members = []
+
+        for member in set_members:
+            # Transform each member's concept
+            member_concept = self._transform_concept_to_openmrs_format(member)
+
+            transformed_member = {"uuid": member.get("uuid"), "concept": member_concept}
+
+            transformed_members.append(transformed_member)
+
+        return transformed_members
+
+    def _transform_answers_to_openmrs_format(
+        self, answers: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Transform concept answers to OpenMRS format.
+
+        Args:
+            answers: Raw answers data
+
+        Returns:
+            Transformed answers
+        """
+        transformed_answers = []
+
+        for answer in answers:
+            # Create concept name info
+            name_info = {
+                "display": answer.get("name", ""),
+                "uuid": f"{answer.get('uuid')}-name",  # Generate a name UUID
+                "name": answer.get("name", ""),
+                "locale": "en",
+                "localePreferred": True,
+                "conceptNameType": "FULLY_SPECIFIED",
+            }
+
+            # Create datatype info
+            datatype_info = {
+                "uuid": answer.get("datatype", {}).get("uuid", ""),
+                "display": answer.get("datatype", {}).get("name", ""),
+            }
+
+            # Create concept class info
+            concept_class_info = {
+                "uuid": answer.get("concept_class", {}).get("uuid", ""),
+                "display": answer.get("concept_class", {}).get("name", ""),
+            }
+
+            transformed_answer = {
+                "uuid": answer.get("uuid"),
+                "display": answer.get("name", ""),
+                "name": name_info,
+                "datatype": datatype_info,
+                "conceptClass": concept_class_info,
+                "set": False,
+                "version": "1.0",
+                "retired": False,
+                "names": [{"uuid": name_info["uuid"], "display": name_info["display"]}],
+                "descriptions": [],
+                "mappings": [],
+                "answers": [],
+                "setMembers": [],
+                "attributes": [],
+                "links": [
+                    {
+                        "rel": "self",
+                        "uri": f"/openmrs/ws/rest/v1/concept/{answer.get('uuid')}",
+                        "resourceAlias": "concept",
+                    }
+                ],
+                "resourceVersion": "1.0",
+            }
+
+            transformed_answers.append(transformed_answer)
+
+        return transformed_answers
+
 
 # Create instance
 orders_crud = OrdersCRUD()
