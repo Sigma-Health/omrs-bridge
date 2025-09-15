@@ -1935,13 +1935,16 @@ class OrdersCRUD(BaseCRUD[Order]):
             return None
 
         # Transform to OpenMRS format
-        return self._transform_to_openmrs_format(raw_data)
+        return self._transform_to_openmrs_format(db, raw_data)
 
-    def _transform_to_openmrs_format(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _transform_to_openmrs_format(
+        self, db: Session, raw_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Transform raw order/concept data to OpenMRS format.
 
         Args:
+            db: Database session
             raw_data: Raw data from get_order_and_concept_details_by_uuids
 
         Returns:
@@ -1962,9 +1965,10 @@ class OrdersCRUD(BaseCRUD[Order]):
 
         # Transform set members if it's a panel
         set_members = []
-        if is_panel and raw_data.get("concept_details", {}).get("set_members"):
-            set_members = self._transform_set_members_to_openmrs_format(
-                raw_data["concept_details"]["set_members"]
+        if is_panel:
+            # For panels, get actual orders within the same encounter/panel
+            set_members = self._get_panel_orders_in_openmrs_format(
+                db, raw_data.get("encounter_id"), raw_data.get("concept_id")
             )
 
         # Build the OpenMRS response
@@ -2136,6 +2140,146 @@ class OrdersCRUD(BaseCRUD[Order]):
             transformed_answers.append(transformed_answer)
 
         return transformed_answers
+
+    def _get_panel_orders_in_openmrs_format(
+        self, db: Session, encounter_id: int, panel_concept_id: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all orders within the same encounter that belong to the panel.
+
+        Args:
+            db: Database session
+            encounter_id: Encounter ID
+            panel_concept_id: Panel concept ID
+
+        Returns:
+            List of orders in OpenMRS format
+        """
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Get all orders in the same encounter
+            from app.models import (
+                Order,
+                Concept,
+                ConceptName,
+                ConceptDatatype,
+                ConceptClass,
+            )
+            from sqlalchemy import func, and_
+
+            panel_orders_query = (
+                db.query(
+                    Order.order_id,
+                    Order.uuid.label("order_uuid"),
+                    Order.order_number,
+                    Order.concept_id,
+                    Order.date_activated,
+                    Order.instructions,
+                    Order.accession_number,
+                    Order.voided,
+                    Order.date_stopped,
+                    Order.auto_expire_date,
+                    Concept.uuid.label("concept_uuid"),
+                    ConceptName.name.label("concept_name"),
+                    ConceptDatatype.uuid.label("datatype_uuid"),
+                    ConceptDatatype.name.label("datatype_name"),
+                    ConceptDatatype.description.label("datatype_description"),
+                    ConceptClass.name.label("concept_class_name"),
+                )
+                .join(Concept, Order.concept_id == Concept.concept_id)
+                .outerjoin(
+                    ConceptName,
+                    and_(
+                        ConceptName.concept_id == Concept.concept_id,
+                        ConceptName.locale == "en",
+                        ConceptName.concept_name_type == "FULLY_SPECIFIED",
+                        ConceptName.voided == False,
+                    ),
+                )
+                .outerjoin(
+                    ConceptDatatype,
+                    Concept.datatype_id == ConceptDatatype.concept_datatype_id,
+                )
+                .outerjoin(
+                    ConceptClass, Concept.class_id == ConceptClass.concept_class_id
+                )
+                .filter(Order.encounter_id == encounter_id)
+                .filter(Order.voided == False)
+                .filter(
+                    Order.concept_id != panel_concept_id
+                )  # Exclude the panel itself
+            )
+
+            panel_orders = panel_orders_query.all()
+            logger.info(
+                f"Found {len(panel_orders)} orders in panel for encounter {encounter_id}"
+            )
+
+            # Transform each order to OpenMRS format
+            transformed_orders = []
+            for order in panel_orders:
+                # Determine order status
+                status = self._determine_order_status_from_order(order)
+
+                # Build concept info for this order
+                concept_info = {
+                    "uuid": order.concept_uuid,
+                    "display": order.concept_name or "Unknown",
+                    "name": order.concept_name or "Unknown",
+                    "datatype": {
+                        "uuid": order.datatype_uuid,
+                        "display": order.datatype_name or "Unknown",
+                        "name": order.datatype_name or "Unknown",
+                        "description": order.datatype_description,
+                    }
+                    if order.datatype_uuid
+                    else None,
+                    "concept_class": order.concept_class_name or "Unknown",
+                    "answers": [],
+                }
+
+                # Create the order in OpenMRS format
+                order_data = {
+                    "uuid": order.order_uuid,
+                    "order_number": order.order_number,
+                    "concept": concept_info,
+                    "status": status,
+                    "date_activated": order.date_activated,
+                    "instructions": order.instructions,
+                    "accession_number": order.accession_number,
+                    "encounter_uuid": None,  # TODO: Get encounter UUID
+                    "is_panel": False,  # Individual orders are not panels
+                    "is_set_member": True,  # These are members of the panel
+                    "set_members": [],
+                }
+
+                transformed_orders.append(order_data)
+
+            return transformed_orders
+
+        except Exception as e:
+            logger.error(f"Error getting panel orders: {str(e)}")
+            return []
+
+    def _determine_order_status_from_order(self, order) -> str:
+        """
+        Determine order status from order object.
+
+        Args:
+            order: Order object from query
+
+        Returns:
+            Status string
+        """
+        if order.voided:
+            return "VOIDED"
+        elif order.date_stopped:
+            return "STOPPED"
+        elif order.auto_expire_date and order.auto_expire_date < datetime.now():
+            return "EXPIRED"
+        else:
+            return "ACTIVE"
 
 
 # Create instance
