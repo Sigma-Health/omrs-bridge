@@ -1388,7 +1388,9 @@ class OrdersCRUD(BaseCRUD[Order]):
         logger = logging.getLogger(__name__)
 
         logger.info(
-            f"Starting get_order_and_concept_details_by_uuids with order_uuid={order_uuid}, concept_uuid={concept_uuid}"
+            "Starting get_order_and_concept_details_by_uuids with order_uuid=%s, concept_uuid=%s",
+            order_uuid,
+            concept_uuid,
         )
 
         from app.models import (
@@ -1397,6 +1399,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             Provider,
         )
         from sqlalchemy.orm import aliased
+        from sqlalchemy import func
 
         # Create aliases for Person and PersonName tables
         OrdererPerson = aliased(Person)
@@ -1459,11 +1462,12 @@ class OrdersCRUD(BaseCRUD[Order]):
                     not PatientPersonName.voided,
                 ),
             )
-            .filter(Order.uuid == order_uuid)
+            .filter(func.lower(Order.uuid) == func.lower(order_uuid))
             .filter(not Order.voided)
         )
 
         logger.info(f"Executing main order query for order_uuid={order_uuid}")
+        logger.info(f"Query SQL: {query}")
         result = query.first()
         if not result:
             logger.warning(f"No order found for order_uuid={order_uuid}")
@@ -1608,6 +1612,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             ConceptDatatype,
             ConceptClass,
         )
+        from sqlalchemy import func
 
         # Get main concept with datatype and class information
         concept_query = (
@@ -1641,11 +1646,12 @@ class OrdersCRUD(BaseCRUD[Order]):
                     not ConceptName.voided,
                 ),
             )
-            .filter(Concept.uuid == concept_uuid)
+            .filter(func.lower(Concept.uuid) == func.lower(concept_uuid))
             .filter(not Concept.retired)
         )
 
         logger.info(f"Executing concept query for concept_uuid={concept_uuid}")
+        logger.info(f"Concept query SQL: {concept_query}")
         concept_result = concept_query.first()
         if not concept_result:
             logger.warning(f"No concept found for concept_uuid={concept_uuid}")
