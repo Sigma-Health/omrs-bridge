@@ -2145,7 +2145,7 @@ class OrdersCRUD(BaseCRUD[Order]):
         self, db: Session, encounter_id: int, panel_concept_id: int
     ) -> List[Dict[str, Any]]:
         """
-        Get all orders within the same encounter that belong to the panel.
+        Get orders for concepts that are members of the panel.
 
         Args:
             db: Database session
@@ -2158,16 +2158,34 @@ class OrdersCRUD(BaseCRUD[Order]):
         logger = logging.getLogger(__name__)
 
         try:
-            # Get all orders in the same encounter
+            # First, get the concept members of the panel from concept_set table
             from app.models import (
                 Order,
                 Concept,
                 ConceptName,
                 ConceptDatatype,
                 ConceptClass,
+                ConceptSet,
             )
             from sqlalchemy import func, and_
 
+            # Get concept members of the panel
+            panel_members_query = db.query(
+                ConceptSet.concept_set.label("member_concept_id")
+            ).filter(ConceptSet.concept_id == panel_concept_id)
+
+            panel_member_concept_ids = [
+                row.member_concept_id for row in panel_members_query.all()
+            ]
+            logger.info(
+                f"Found {len(panel_member_concept_ids)} concept members in panel {panel_concept_id}"
+            )
+
+            if not panel_member_concept_ids:
+                logger.warning(f"No concept members found for panel {panel_concept_id}")
+                return []
+
+            # Now get orders for these specific concepts within the same encounter
             panel_orders_query = (
                 db.query(
                     Order.order_id,
@@ -2207,13 +2225,13 @@ class OrdersCRUD(BaseCRUD[Order]):
                 .filter(Order.encounter_id == encounter_id)
                 .filter(Order.voided == False)
                 .filter(
-                    Order.concept_id != panel_concept_id
-                )  # Exclude the panel itself
+                    Order.concept_id.in_(panel_member_concept_ids)
+                )  # Only panel member concepts
             )
 
             panel_orders = panel_orders_query.all()
             logger.info(
-                f"Found {len(panel_orders)} orders in panel for encounter {encounter_id}"
+                f"Found {len(panel_orders)} orders for panel members in encounter {encounter_id}"
             )
 
             # Transform each order to OpenMRS format
