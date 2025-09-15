@@ -4,14 +4,22 @@ from typing import Optional
 
 def validate_uuid(uuid_string: str) -> bool:
     """
-    Validate UUID format (8-4-4-4-12 format)
-    Example: 6000e165-57fd-4ad3-af48-0df1a6b157a9
+    Validate UUID format - supports both standard UUID and OpenMRS formats:
+    - Standard UUID: 8-4-4-4-12 format
+    - OpenMRS UUID: 36 characters without hyphens
     """
-    uuid_pattern = re.compile(
-        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-        re.IGNORECASE
+    # Standard UUID format with hyphens
+    standard_uuid_pattern = re.compile(
+        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
     )
-    return bool(uuid_pattern.match(uuid_string))
+
+    # OpenMRS UUID format without hyphens (36 characters)
+    openmrs_uuid_pattern = re.compile(r"^[0-9a-f]{36}$", re.IGNORECASE)
+
+    return bool(
+        standard_uuid_pattern.match(uuid_string)
+        or openmrs_uuid_pattern.match(uuid_string)
+    )
 
 
 def format_uuid(uuid_string: str) -> Optional[str]:
@@ -27,10 +35,17 @@ def format_uuid(uuid_string: str) -> Optional[str]:
 def extract_uuid_from_string(text: str) -> Optional[str]:
     """
     Extract UUID from a string that might contain other text
+    Supports both standard UUID and OpenMRS UUID formats
     """
-    uuid_pattern = re.compile(
-        r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
-        re.IGNORECASE
+    # Try standard UUID format first
+    standard_uuid_pattern = re.compile(
+        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE
     )
-    match = uuid_pattern.search(text)
-    return match.group(0).lower() if match else None 
+    match = standard_uuid_pattern.search(text)
+    if match:
+        return match.group(0).lower()
+
+    # Try OpenMRS UUID format (36 characters without hyphens)
+    openmrs_uuid_pattern = re.compile(r"[0-9a-f]{36}", re.IGNORECASE)
+    match = openmrs_uuid_pattern.search(text)
+    return match.group(0).lower() if match else None
