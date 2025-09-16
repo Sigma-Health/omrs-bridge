@@ -12,8 +12,12 @@ from app.models import Order
 from app.sql.sql_utils import (
     execute_enriched_orders_query,
     process_raw_query_results,
+    process_expanded_order_results,
 )
-from app.sql.orders_sql import get_orders_with_enrichment_sql
+from app.sql.orders_sql import (
+    get_orders_with_enrichment_sql,
+    get_single_order_with_expansion_sql,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -903,6 +907,45 @@ class OrdersCRUD(BaseCRUD[Order]):
         result = execute_enriched_orders_query(db, raw_sql, conditions, skip, limit)
 
         return process_raw_query_results(result)
+
+    def get_single_order_with_expansion(
+        self,
+        db: Session,
+        order_id: Optional[int] = None,
+        order_uuid: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get a single order with expansion details.
+
+        If the order's concept is_set=true (panel), includes set members (actual orders).
+        If the order's concept is_set=false (regular), includes parent concept metadata.
+
+        Args:
+            db: Database session
+            order_id: Order ID (optional)
+            order_uuid: Order UUID (optional)
+
+        Returns:
+            Dictionary with order, set_members (if panel), and parent_concept (if regular)
+        """
+        if not order_id and not order_uuid:
+            raise ValueError("Either order_id or order_uuid must be provided")
+
+        # Get the SQL query
+        raw_sql = get_single_order_with_expansion_sql()
+
+        # Define WHERE conditions
+        where_conditions = {"voided": False}
+        if order_id:
+            where_conditions["order_id"] = order_id
+        elif order_uuid:
+            where_conditions["order_uuid"] = order_uuid
+
+        # Execute query (no pagination for single order)
+        result = execute_enriched_orders_query(db, raw_sql, where_conditions, 0, 1000)
+
+        # Process results
+        return process_expanded_order_results(result)
 
 
 # Create instance

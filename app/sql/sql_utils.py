@@ -44,6 +44,10 @@ def build_where_clause(conditions: Dict[str, Any]) -> str:
             where_parts.append("o.order_action = :order_action")
         elif field == "concept_uuid":
             where_parts.append("c.uuid = :concept_uuid")
+        elif field == "order_id":
+            where_parts.append("o.order_id = :order_id")
+        elif field == "order_uuid":
+            where_parts.append("o.uuid = :order_uuid")
         # Add more conditions as needed
 
     return " AND ".join(where_parts) if where_parts else "1=1"
@@ -207,3 +211,220 @@ def process_raw_query_results(result) -> List[Dict[str, Any]]:
         orders.append(order_dict)
 
     return orders
+
+
+def process_expanded_order_results(result) -> Dict[str, Any]:
+    """
+    Process raw SQL query results for a single order with expansion into structured format.
+
+    Returns:
+        Dictionary with main order, set_members (if panel), and parent_concept (if regular)
+    """
+    rows = list(result)
+    if not rows:
+        return None
+
+    # Get the first row for main order data
+    main_row = rows[0]
+
+    # Build main order dictionary (same as process_raw_query_results)
+    order_dict = {
+        # Order fields
+        "order_id": main_row.order_id,
+        "order_type_id": main_row.order_type_id,
+        "concept_id": main_row.concept_id,
+        "orderer": main_row.orderer,
+        "encounter_id": main_row.encounter_id,
+        "instructions": main_row.instructions,
+        "date_activated": main_row.date_activated,
+        "auto_expire_date": main_row.auto_expire_date,
+        "date_stopped": main_row.date_stopped,
+        "order_reason": main_row.order_reason,
+        "order_reason_non_coded": main_row.order_reason_non_coded,
+        "creator": main_row.creator,
+        "date_created": main_row.date_created,
+        "voided": main_row.voided,
+        "voided_by": main_row.voided_by,
+        "date_voided": main_row.date_voided,
+        "void_reason": main_row.void_reason,
+        "patient_id": main_row.patient_id,
+        "accession_number": main_row.accession_number,
+        "uuid": main_row.uuid,
+        "urgency": main_row.urgency,
+        "order_number": main_row.order_number,
+        "previous_order_id": main_row.previous_order_id,
+        "order_action": main_row.order_action,
+        "comment_to_fulfiller": main_row.comment_to_fulfiller,
+        "care_setting": main_row.care_setting,
+        "scheduled_date": main_row.scheduled_date,
+        "order_group_id": main_row.order_group_id,
+        "sort_weight": main_row.sort_weight,
+        "fulfiller_comment": main_row.fulfiller_comment,
+        "fulfiller_status": main_row.fulfiller_status,
+        "form_namespace_and_path": main_row.form_namespace_and_path,
+    }
+
+    # Build enriched orderer info
+    orderer_info = None
+    if main_row.orderer_person_id:
+        orderer_name_parts = []
+        if main_row.orderer_prefix:
+            orderer_name_parts.append(main_row.orderer_prefix)
+        if main_row.orderer_given_name:
+            orderer_name_parts.append(main_row.orderer_given_name)
+        if main_row.orderer_middle_name:
+            orderer_name_parts.append(main_row.orderer_middle_name)
+        if main_row.orderer_family_name:
+            orderer_name_parts.append(main_row.orderer_family_name)
+        if main_row.orderer_family_name2:
+            orderer_name_parts.append(main_row.orderer_family_name2)
+        if main_row.orderer_family_name_suffix:
+            orderer_name_parts.append(main_row.orderer_family_name_suffix)
+
+        orderer_name = (
+            " ".join(orderer_name_parts)
+            if orderer_name_parts
+            else main_row.provider_name
+        )
+
+        orderer_info = {
+            "person_id": main_row.orderer_person_id,
+            "uuid": main_row.orderer_uuid,
+            "name": orderer_name,
+            "gender": main_row.orderer_gender,
+            "birthdate": main_row.orderer_birthdate,
+            "provider_id": main_row.provider_id,
+            "provider_name": main_row.provider_name,
+            "provider_identifier": main_row.provider_identifier,
+            "provider_uuid": main_row.provider_uuid,
+        }
+
+    # Build enriched patient info
+    patient_info = None
+    if main_row.patient_person_id:
+        patient_name_parts = []
+        if main_row.patient_prefix:
+            patient_name_parts.append(main_row.patient_prefix)
+        if main_row.patient_given_name:
+            patient_name_parts.append(main_row.patient_given_name)
+        if main_row.patient_middle_name:
+            patient_name_parts.append(main_row.patient_middle_name)
+        if main_row.patient_family_name:
+            patient_name_parts.append(main_row.patient_family_name)
+        if main_row.patient_family_name2:
+            patient_name_parts.append(main_row.patient_family_name2)
+        if main_row.patient_family_name_suffix:
+            patient_name_parts.append(main_row.patient_family_name_suffix)
+
+        patient_name = " ".join(patient_name_parts) if patient_name_parts else None
+
+        patient_info = {
+            "person_id": main_row.patient_person_id,
+            "uuid": main_row.patient_uuid,
+            "name": patient_name,
+            "gender": main_row.patient_gender,
+            "birthdate": main_row.patient_birthdate,
+        }
+
+    # Build enriched concept info with additional metadata
+    concept_info = None
+    if main_row.concept_id:
+        concept_info = {
+            "concept_id": main_row.concept_id,
+            "uuid": main_row.concept_uuid,
+            "name": main_row.concept_name,
+            "short_name": main_row.concept_short_name,
+            "description": main_row.concept_description,
+            "is_set": main_row.concept_is_set,
+            "datatype": {
+                "concept_datatype_id": main_row.concept_datatype_id,
+                "uuid": main_row.concept_datatype_uuid,
+                "name": main_row.concept_datatype_name,
+                "description": main_row.concept_datatype_description,
+            }
+            if main_row.concept_datatype_id
+            else None,
+            "concept_class": {
+                "concept_class_id": main_row.concept_class_id,
+                "uuid": main_row.concept_class_uuid,
+                "name": main_row.concept_class_name,
+                "description": main_row.concept_class_description,
+            }
+            if main_row.concept_class_id
+            else None,
+        }
+
+    # Add enriched information to order
+    order_dict["orderer_info"] = orderer_info
+    order_dict["patient_info"] = patient_info
+    order_dict["concept_info"] = concept_info
+
+    # Process set members (if panel - is_set=true)
+    set_members = []
+    if main_row.concept_is_set:
+        seen_orders = set()
+        for row in rows:
+            if row.set_member_order_id and row.set_member_order_id not in seen_orders:
+                seen_orders.add(row.set_member_order_id)
+
+                set_member_order = {
+                    "order_id": row.set_member_order_id,
+                    "uuid": row.set_member_order_uuid,
+                    "order_number": row.set_member_order_number,
+                    "instructions": row.set_member_instructions,
+                    "date_activated": row.set_member_date_activated,
+                    "auto_expire_date": row.set_member_auto_expire_date,
+                    "date_stopped": row.set_member_date_stopped,
+                    "voided": row.set_member_voided,
+                    "urgency": row.set_member_urgency,
+                    "order_action": row.set_member_order_action,
+                    "accession_number": row.set_member_accession_number,
+                    "concept_info": {
+                        "concept_id": row.set_member_concept_id,
+                        "uuid": row.set_member_concept_uuid,
+                        "name": row.set_member_concept_name,
+                        "short_name": row.set_member_concept_short_name,
+                        "description": row.set_member_concept_description,
+                        "is_set": row.set_member_concept_is_set,
+                    }
+                    if row.set_member_concept_id
+                    else None,
+                }
+                set_members.append(set_member_order)
+
+    # Process parent concept metadata (if regular concept - is_set=false)
+    parent_concept_info = None
+    if not main_row.concept_is_set and main_row.parent_concept_id:
+        parent_concept_info = {
+            "concept_id": main_row.parent_concept_id,
+            "uuid": main_row.parent_concept_uuid,
+            "name": main_row.parent_concept_name,
+            "short_name": main_row.parent_concept_short_name,
+            "description": main_row.parent_concept_description,
+            "is_set": main_row.parent_concept_is_set,
+            "datatype": {
+                "concept_datatype_id": main_row.parent_concept_datatype_id,
+                "uuid": main_row.parent_concept_datatype_uuid,
+                "name": main_row.parent_concept_datatype_name,
+                "description": main_row.parent_concept_datatype_description,
+            }
+            if main_row.parent_concept_datatype_id
+            else None,
+            "concept_class": {
+                "concept_class_id": main_row.parent_concept_class_id,
+                "uuid": main_row.parent_concept_class_uuid,
+                "name": main_row.parent_concept_class_name,
+                "description": main_row.parent_concept_class_description,
+            }
+            if main_row.parent_concept_class_id
+            else None,
+        }
+
+    # Build final result
+    result_dict = {
+        "order": order_dict,
+        "set_members": set_members if set_members else None,
+        "parent_concept": parent_concept_info,
+    }
+
+    return result_dict

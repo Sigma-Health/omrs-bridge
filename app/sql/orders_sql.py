@@ -145,3 +145,281 @@ def get_orders_with_enrichment_sql() -> str:
     ORDER BY o.order_id
     LIMIT :limit OFFSET :skip
     """
+
+
+def get_single_order_with_expansion_sql() -> str:
+    """
+    Get a single order with enrichment details and conditional expansion.
+
+    If the order's concept is_set=true (panel), it will include set members (actual orders).
+    If the order's concept is_set=false (regular), it will include parent concept metadata.
+
+    This query returns:
+    - Main order with all enrichment details (same as get_orders_with_enrichment_sql)
+    - Set members (if is_set=true) - actual orders that are members of this panel
+    - Parent concept metadata (if is_set=false) - metadata about the parent concept
+    """
+    return """
+    -- Main order query with enrichment
+    SELECT 
+        o.order_id,
+        o.order_type_id,
+        o.concept_id,
+        o.orderer,
+        o.encounter_id,
+        o.instructions,
+        o.date_activated,
+        o.auto_expire_date,
+        o.date_stopped,
+        o.order_reason,
+        o.order_reason_non_coded,
+        o.creator,
+        o.date_created,
+        o.voided,
+        o.voided_by,
+        o.date_voided,
+        o.void_reason,
+        o.patient_id,
+        o.accession_number,
+        o.uuid,
+        o.urgency,
+        o.order_number,
+        o.previous_order_id,
+        o.order_action,
+        o.comment_to_fulfiller,
+        o.care_setting,
+        o.scheduled_date,
+        o.order_group_id,
+        o.sort_weight,
+        o.fulfiller_comment,
+        o.fulfiller_status,
+        o.form_namespace_and_path,
+        
+        -- Provider information
+        p.provider_id,
+        p.name AS provider_name,
+        p.identifier AS provider_identifier,
+        p.uuid AS provider_uuid,
+        
+        -- Orderer person information
+        op.person_id AS orderer_person_id,
+        op.uuid AS orderer_uuid,
+        op.gender AS orderer_gender,
+        op.birthdate AS orderer_birthdate,
+        
+        -- Orderer name information
+        opn.given_name AS orderer_given_name,
+        opn.family_name AS orderer_family_name,
+        opn.prefix AS orderer_prefix,
+        opn.middle_name AS orderer_middle_name,
+        opn.family_name2 AS orderer_family_name2,
+        opn.family_name_suffix AS orderer_family_name_suffix,
+        
+        -- Patient person information
+        pt.person_id AS patient_person_id,
+        pt.uuid AS patient_uuid,
+        pt.gender AS patient_gender,
+        pt.birthdate AS patient_birthdate,
+        
+        -- Patient name information
+        ptn.given_name AS patient_given_name,
+        ptn.family_name AS patient_family_name,
+        ptn.prefix AS patient_prefix,
+        ptn.middle_name AS patient_middle_name,
+        ptn.family_name2 AS patient_family_name2,
+        ptn.family_name_suffix AS patient_family_name_suffix,
+        
+        -- Main concept information
+        c.concept_id AS concept_id,
+        c.uuid AS concept_uuid,
+        c.short_name AS concept_short_name,
+        c.description AS concept_description,
+        c.is_set AS concept_is_set,
+        
+        -- Main concept name information
+        cn.concept_name_id AS concept_name_id,
+        cn.name AS concept_name,
+        cn.locale AS concept_name_locale,
+        cn.locale_preferred AS concept_name_locale_preferred,
+        cn.concept_name_type AS concept_name_type,
+        
+        -- Concept datatype information
+        cdt.concept_datatype_id AS concept_datatype_id,
+        cdt.uuid AS concept_datatype_uuid,
+        cdt.name AS concept_datatype_name,
+        cdt.description AS concept_datatype_description,
+        
+        -- Concept class information
+        cc.concept_class_id AS concept_class_id,
+        cc.uuid AS concept_class_uuid,
+        cc.name AS concept_class_name,
+        cc.description AS concept_class_description,
+        
+        -- Set members (if is_set=true) - actual orders that are members of this panel
+        sm_order.order_id AS set_member_order_id,
+        sm_order.uuid AS set_member_order_uuid,
+        sm_order.order_number AS set_member_order_number,
+        sm_order.instructions AS set_member_instructions,
+        sm_order.date_activated AS set_member_date_activated,
+        sm_order.auto_expire_date AS set_member_auto_expire_date,
+        sm_order.date_stopped AS set_member_date_stopped,
+        sm_order.voided AS set_member_voided,
+        sm_order.urgency AS set_member_urgency,
+        sm_order.order_action AS set_member_order_action,
+        sm_order.accession_number AS set_member_accession_number,
+        
+        -- Set member concept information
+        sm_concept.concept_id AS set_member_concept_id,
+        sm_concept.uuid AS set_member_concept_uuid,
+        sm_concept.short_name AS set_member_concept_short_name,
+        sm_concept.description AS set_member_concept_description,
+        sm_concept.is_set AS set_member_concept_is_set,
+        
+        -- Set member concept name information
+        sm_cn.concept_name_id AS set_member_concept_name_id,
+        sm_cn.name AS set_member_concept_name,
+        sm_cn.locale AS set_member_concept_name_locale,
+        sm_cn.concept_name_type AS set_member_concept_name_type,
+        
+        -- Parent concept metadata (if is_set=false) - metadata about the parent concept
+        parent_concept.concept_id AS parent_concept_id,
+        parent_concept.uuid AS parent_concept_uuid,
+        parent_concept.short_name AS parent_concept_short_name,
+        parent_concept.description AS parent_concept_description,
+        parent_concept.is_set AS parent_concept_is_set,
+        
+        -- Parent concept name information
+        parent_cn.concept_name_id AS parent_concept_name_id,
+        parent_cn.name AS parent_concept_name,
+        parent_cn.locale AS parent_concept_name_locale,
+        parent_cn.concept_name_type AS parent_concept_name_type,
+        
+        -- Parent concept datatype information
+        parent_cdt.concept_datatype_id AS parent_concept_datatype_id,
+        parent_cdt.uuid AS parent_concept_datatype_uuid,
+        parent_cdt.name AS parent_concept_datatype_name,
+        parent_cdt.description AS parent_concept_datatype_description,
+        
+        -- Parent concept class information
+        parent_cc.concept_class_id AS parent_concept_class_id,
+        parent_cc.uuid AS parent_concept_class_uuid,
+        parent_cc.name AS parent_concept_class_name,
+        parent_cc.description AS parent_concept_class_description
+
+    FROM orders o
+
+    -- Join with encounter and visit
+    INNER JOIN encounter e ON o.encounter_id = e.encounter_id
+    INNER JOIN visit v ON e.visit_id = v.visit_id
+
+    -- Join for orderer information through provider table
+    LEFT OUTER JOIN provider p ON (
+        p.provider_id = o.orderer 
+        AND p.retired = false
+    )
+
+    LEFT OUTER JOIN person op ON (
+        op.person_id = p.person_id 
+        AND op.voided = false
+    )
+
+    LEFT OUTER JOIN person_name opn ON (
+        opn.person_id = o.orderer 
+        AND opn.preferred = true 
+        AND opn.voided = false
+    )
+
+    -- Join for patient information
+    LEFT OUTER JOIN person pt ON (
+        pt.person_id = o.patient_id 
+        AND pt.voided = false
+    )
+
+    LEFT OUTER JOIN person_name ptn ON (
+        ptn.person_id = o.patient_id 
+        AND ptn.preferred = true 
+        AND ptn.voided = false
+    )
+
+    -- Join for main concept information
+    LEFT OUTER JOIN concept c ON (
+        c.concept_id = o.concept_id 
+        AND c.retired = false
+    )
+
+    -- Join for main concept name information (English locale, FULLY_SPECIFIED type)
+    LEFT OUTER JOIN concept_name cn ON (
+        cn.concept_id = c.concept_id 
+        AND cn.locale = 'en'
+        AND cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND cn.voided = false
+    )
+
+    -- Join for concept datatype information
+    LEFT OUTER JOIN concept_datatype cdt ON (
+        cdt.concept_datatype_id = c.datatype_id
+        AND cdt.retired = false
+    )
+
+    -- Join for concept class information
+    LEFT OUTER JOIN concept_class cc ON (
+        cc.concept_class_id = c.class_id
+        AND cc.retired = false
+    )
+
+    -- Join for set members (if is_set=true) - actual orders that are members of this panel
+    LEFT OUTER JOIN concept_set cs ON (
+        cs.concept_set = c.concept_id
+        AND c.is_set = true
+    )
+    
+    LEFT OUTER JOIN orders sm_order ON (
+        sm_order.concept_id = cs.concept_id
+        AND sm_order.encounter_id = o.encounter_id
+        AND sm_order.voided = false
+    )
+    
+    LEFT OUTER JOIN concept sm_concept ON (
+        sm_concept.concept_id = sm_order.concept_id
+        AND sm_concept.retired = false
+    )
+    
+    LEFT OUTER JOIN concept_name sm_cn ON (
+        sm_cn.concept_id = sm_concept.concept_id
+        AND sm_cn.locale = 'en'
+        AND sm_cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND sm_cn.voided = false
+    )
+
+    -- Join for parent concept metadata (if is_set=false) - metadata about the parent concept
+    LEFT OUTER JOIN concept_set parent_cs ON (
+        parent_cs.concept_id = c.concept_id
+        AND c.is_set = false
+    )
+    
+    LEFT OUTER JOIN concept parent_concept ON (
+        parent_concept.concept_id = parent_cs.concept_set
+        AND parent_concept.retired = false
+    )
+    
+    LEFT OUTER JOIN concept_name parent_cn ON (
+        parent_cn.concept_id = parent_concept.concept_id
+        AND parent_cn.locale = 'en'
+        AND parent_cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND parent_cn.voided = false
+    )
+    
+    LEFT OUTER JOIN concept_datatype parent_cdt ON (
+        parent_cdt.concept_datatype_id = parent_concept.datatype_id
+        AND parent_cdt.retired = false
+    )
+    
+    LEFT OUTER JOIN concept_class parent_cc ON (
+        parent_cc.concept_class_id = parent_concept.class_id
+        AND parent_cc.retired = false
+    )
+
+    WHERE {where_clause}
+
+    ORDER BY o.order_id, sm_order.order_id
+    """

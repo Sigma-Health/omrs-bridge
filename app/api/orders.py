@@ -601,6 +601,71 @@ async def get_order_by_uuid(
     return order
 
 
+@router.get("/{order_id}/with-expansion")
+async def get_order_with_expansion_by_id(
+    order_id: int,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Get a single order with expansion details by order ID.
+
+    If the order's concept is_set=true (panel), includes set members (actual orders).
+    If the order's concept is_set=false (regular), includes parent concept metadata.
+    """
+    try:
+        result = orders.get_single_order_with_expansion(db, order_id=order_id)
+        if not result:
+            raise HTTPException(
+                status_code=404,
+                detail="Order not found",
+            )
+        return result
+    except Exception as e:
+        logger.error(f"Failed to get order with expansion: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get order with expansion: {str(e)}",
+        )
+
+
+@router.get("/uuid/{order_uuid}/with-expansion")
+async def get_order_with_expansion_by_uuid(
+    order_uuid: str,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Get a single order with expansion details by order UUID.
+
+    If the order's concept is_set=true (panel), includes set members (actual orders).
+    If the order's concept is_set=false (regular), includes parent concept metadata.
+    """
+    try:
+        # Validate UUID format
+        if not validate_uuid(order_uuid):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid order UUID format",
+            )
+
+        result = orders.get_single_order_with_expansion(db, order_uuid=order_uuid)
+        if not result:
+            raise HTTPException(
+                status_code=404,
+                detail="Order not found",
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get order with expansion: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get order with expansion: {str(e)}",
+        )
+
+
 @router.patch("/{order_id}", response_model=OrderUpdateResponse)
 async def update_order_partial(
     order_id: int,
