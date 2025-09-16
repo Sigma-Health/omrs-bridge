@@ -402,5 +402,5 @@ def get_single_order_with_expansion_sql() -> str:
 
     WHERE {where_clause}
 
-    ORDER BY o.order_id, sm_order.order_id
+    ORDER BY o.order_id, sm_concept.concept_id
     """
