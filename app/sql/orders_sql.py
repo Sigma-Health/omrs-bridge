@@ -370,7 +370,7 @@ def get_single_order_with_expansion_sql() -> str:
     -- Join for set members (if is_set=true) - actual orders that are members of this panel
     LEFT OUTER JOIN concept_set cs ON (
         cs.concept_set = c.concept_id
-        AND c.is_set = true
+        AND c.is_set = 1
     )
     
     LEFT OUTER JOIN orders sm_order ON (
@@ -394,7 +394,7 @@ def get_single_order_with_expansion_sql() -> str:
     -- Join for parent concept metadata (if is_set=false) - metadata about the parent concept
     LEFT OUTER JOIN concept_set parent_cs ON (
         parent_cs.concept_id = c.concept_id
-        AND c.is_set = false
+        AND c.is_set = 0
     )
     
     LEFT OUTER JOIN concept parent_concept ON (

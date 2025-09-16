@@ -361,7 +361,7 @@ def process_expanded_order_results(result) -> Dict[str, Any]:
 
     # Process set members (if panel - is_set=true)
     set_members = []
-    if main_row.concept_is_set:
+    if main_row.concept_is_set == 1:
         seen_orders = set()
         for row in rows:
             if row.set_member_order_id and row.set_member_order_id not in seen_orders:
@@ -394,7 +394,7 @@ def process_expanded_order_results(result) -> Dict[str, Any]:
 
     # Process parent concept metadata (if regular concept - is_set=false)
     parent_concept_info = None
-    if not main_row.concept_is_set and main_row.parent_concept_id:
+    if main_row.concept_is_set == 0 and main_row.parent_concept_id:
         parent_concept_info = {
             "concept_id": main_row.parent_concept_id,
             "uuid": main_row.parent_concept_uuid,
