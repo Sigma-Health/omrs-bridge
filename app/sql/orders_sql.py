@@ -411,7 +411,6 @@ def get_single_order_with_expansion_sql() -> str:
     
     LEFT OUTER JOIN concept_answer sm_ca ON (
         sm_ca.concept_id = sm_concept.concept_id
-        AND sm_ca.retired = false
     )
     
     LEFT OUTER JOIN concept sm_answer_concept ON (
