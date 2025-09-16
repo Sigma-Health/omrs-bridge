@@ -268,6 +268,18 @@ def get_single_order_with_expansion_sql() -> str:
         sm_cn.locale AS set_member_concept_name_locale,
         sm_cn.concept_name_type AS set_member_concept_name_type,
         
+        -- Set member concept datatype information
+        sm_cdt.concept_datatype_id AS set_member_concept_datatype_id,
+        sm_cdt.uuid AS set_member_concept_datatype_uuid,
+        sm_cdt.name AS set_member_concept_datatype_name,
+        sm_cdt.description AS set_member_concept_datatype_description,
+        
+        -- Set member concept class information
+        sm_cc.concept_class_id AS set_member_concept_class_id,
+        sm_cc.uuid AS set_member_concept_class_uuid,
+        sm_cc.name AS set_member_concept_class_name,
+        sm_cc.description AS set_member_concept_class_description,
+        
         -- Parent concept metadata (if is_set=false) - metadata about the parent concept
         parent_concept.concept_id AS parent_concept_id,
         parent_concept.uuid AS parent_concept_uuid,
@@ -370,6 +382,16 @@ def get_single_order_with_expansion_sql() -> str:
         AND sm_cn.locale = 'en'
         AND sm_cn.concept_name_type = 'FULLY_SPECIFIED'
         AND sm_cn.voided = false
+    )
+    
+    LEFT OUTER JOIN concept_datatype sm_cdt ON (
+        sm_cdt.concept_datatype_id = sm_concept.datatype_id
+        AND sm_cdt.retired = false
+    )
+    
+    LEFT OUTER JOIN concept_class sm_cc ON (
+        sm_cc.concept_class_id = sm_concept.class_id
+        AND sm_cc.retired = false
     )
 
     -- Join for parent concept metadata (if is_set=false) - metadata about the parent concept

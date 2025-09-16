@@ -400,6 +400,22 @@ def process_expanded_order_results(result) -> Dict[str, Any]:
                     "short_name": row.set_member_concept_short_name,
                     "description": row.set_member_concept_description,
                     "is_set": row.set_member_concept_is_set,
+                    "datatype": {
+                        "concept_datatype_id": row.set_member_concept_datatype_id,
+                        "uuid": row.set_member_concept_datatype_uuid,
+                        "name": row.set_member_concept_datatype_name,
+                        "description": row.set_member_concept_datatype_description,
+                    }
+                    if row.set_member_concept_datatype_id
+                    else None,
+                    "concept_class": {
+                        "concept_class_id": row.set_member_concept_class_id,
+                        "uuid": row.set_member_concept_class_uuid,
+                        "name": row.set_member_concept_class_name,
+                        "description": row.set_member_concept_class_description,
+                    }
+                    if row.set_member_concept_class_id
+                    else None,
                 }
                 set_members.append(set_member_concept)
 
