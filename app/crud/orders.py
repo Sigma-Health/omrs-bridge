@@ -947,12 +947,45 @@ class OrdersCRUD(BaseCRUD[Order]):
 
         logger.info(f"WHERE conditions: {where_conditions}")
 
+        # First, let's check if the basic order exists
+        from sqlalchemy import text
+
+        if order_id:
+            basic_query = text(
+                "SELECT order_id, uuid, concept_id FROM orders WHERE order_id = :order_id AND voided = 0"
+            )
+            basic_result = db.execute(basic_query, {"order_id": order_id}).fetchone()
+        elif order_uuid:
+            basic_query = text(
+                "SELECT order_id, uuid, concept_id FROM orders WHERE uuid = :order_uuid AND voided = 0"
+            )
+            basic_result = db.execute(
+                basic_query, {"order_uuid": order_uuid}
+            ).fetchone()
+
+        if basic_result:
+            logger.info(
+                f"Basic order found: order_id={basic_result.order_id}, uuid={basic_result.uuid}, concept_id={basic_result.concept_id}"
+            )
+        else:
+            logger.warning(
+                "Basic order NOT found - this explains why expansion query returns no results"
+            )
+            return None
+
         # Execute query (no pagination for single order)
         result = execute_enriched_orders_query(db, raw_sql, where_conditions, 0, 1000)
 
         # Log raw result count
         rows = list(result)
         logger.info(f"Raw SQL result: {len(rows)} rows returned")
+
+        if not rows:
+            logger.warning(
+                "Complex expansion query returned no rows - falling back to basic order + manual expansion"
+            )
+            # Fallback: get basic order and manually get expansion data
+            return self._get_order_with_manual_expansion(db, basic_result)
 
         if rows:
             first_row = rows[0]
@@ -1044,6 +1077,121 @@ class OrdersCRUD(BaseCRUD[Order]):
                 logger.info("Concept is not a panel (is_set=0)")
         else:
             logger.warning(f"Concept {concept_id} not found")
+
+    def _get_order_with_manual_expansion(
+        self, db: Session, basic_order
+    ) -> Dict[str, Any]:
+        """
+        Fallback method to get order with manual expansion when complex query fails.
+        """
+        from sqlalchemy import text
+
+        logger.info("Using manual expansion fallback")
+
+        # Get the full order details using the simpler query
+        order_query = text("""
+            SELECT o.*, 
+                   c.concept_id, c.uuid as concept_uuid, c.short_name as concept_short_name, 
+                   c.description as concept_description, c.is_set as concept_is_set,
+                   cn.name as concept_name
+            FROM orders o
+            LEFT JOIN concept c ON o.concept_id = c.concept_id AND c.retired = false
+            LEFT JOIN concept_name cn ON cn.concept_id = c.concept_id 
+                AND cn.locale = 'en' AND cn.concept_name_type = 'FULLY_SPECIFIED' AND cn.voided = false
+            WHERE o.order_id = :order_id AND o.voided = false
+        """)
+
+        order_result = db.execute(
+            order_query, {"order_id": basic_order.order_id}
+        ).fetchone()
+
+        if not order_result:
+            logger.error("Could not get order details even with simple query")
+            return None
+
+        # Build basic order dict
+        order_dict = {
+            "order_id": order_result.order_id,
+            "order_type_id": order_result.order_type_id,
+            "concept_id": order_result.concept_id,
+            "orderer": order_result.orderer,
+            "encounter_id": order_result.encounter_id,
+            "instructions": order_result.instructions,
+            "date_activated": order_result.date_activated,
+            "auto_expire_date": order_result.auto_expire_date,
+            "date_stopped": order_result.date_stopped,
+            "order_reason": order_result.order_reason,
+            "order_reason_non_coded": order_result.order_reason_non_coded,
+            "creator": order_result.creator,
+            "date_created": order_result.date_created,
+            "voided": order_result.voided,
+            "voided_by": order_result.voided_by,
+            "date_voided": order_result.date_voided,
+            "void_reason": order_result.void_reason,
+            "patient_id": order_result.patient_id,
+            "accession_number": order_result.accession_number,
+            "uuid": order_result.uuid,
+            "urgency": order_result.urgency,
+            "order_number": order_result.order_number,
+            "previous_order_id": order_result.previous_order_id,
+            "order_action": order_result.order_action,
+            "comment_to_fulfiller": order_result.comment_to_fulfiller,
+            "care_setting": order_result.care_setting,
+            "scheduled_date": order_result.scheduled_date,
+            "order_group_id": order_result.order_group_id,
+            "sort_weight": order_result.sort_weight,
+            "fulfiller_comment": order_result.fulfiller_comment,
+            "fulfiller_status": order_result.fulfiller_status,
+            "form_namespace_and_path": order_result.form_namespace_and_path,
+        }
+
+        # Add concept info
+        concept_info = {
+            "concept_id": order_result.concept_id,
+            "uuid": order_result.concept_uuid,
+            "name": order_result.concept_name,
+            "short_name": order_result.concept_short_name,
+            "description": order_result.concept_description,
+            "is_set": order_result.concept_is_set,
+        }
+        order_dict["concept_info"] = concept_info
+
+        # Get set members if it's a panel
+        set_members = []
+        if order_result.concept_is_set == 1:
+            logger.info("Getting set members manually")
+            set_query = text("""
+                SELECT cs.concept_id, c.uuid, c.short_name, c.description, c.is_set,
+                       cn.name
+                FROM concept_set cs
+                JOIN concept c ON cs.concept_id = c.concept_id AND c.retired = false
+                LEFT JOIN concept_name cn ON cn.concept_id = c.concept_id 
+                    AND cn.locale = 'en' AND cn.concept_name_type = 'FULLY_SPECIFIED' AND cn.voided = false
+                WHERE cs.concept_set = :concept_id
+            """)
+
+            set_results = db.execute(
+                set_query, {"concept_id": order_result.concept_id}
+            ).fetchall()
+
+            for row in set_results:
+                set_member = {
+                    "concept_id": row.concept_id,
+                    "uuid": row.uuid,
+                    "name": row.name,
+                    "short_name": row.short_name,
+                    "description": row.description,
+                    "is_set": row.is_set,
+                }
+                set_members.append(set_member)
+
+            logger.info(f"Found {len(set_members)} set members manually")
+
+        return {
+            "order": order_dict,
+            "set_members": set_members if set_members else None,
+            "parent_concept": None,  # TODO: implement if needed
+        }
 
 
 # Create instance
