@@ -348,10 +348,12 @@ def process_expanded_order_results(result) -> Dict[str, Any]:
     # Build enriched concept info with additional metadata
     concept_info = None
     if main_row.concept_id:
-        # Collect answers for main concept
+        # Collect answers for main concept (deduplicated)
         main_concept_answers = []
+        seen_answer_ids = set()
         for row in rows:
-            if row.concept_answer_id:
+            if row.concept_answer_id and row.concept_answer_id not in seen_answer_ids:
+                seen_answer_ids.add(row.concept_answer_id)
                 answer = {
                     "concept_answer_id": row.concept_answer_id,
                     "sort_weight": row.concept_answer_sort_weight,
