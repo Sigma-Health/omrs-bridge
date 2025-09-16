@@ -1392,6 +1392,9 @@ class OrdersCRUD(BaseCRUD[Order]):
             order_uuid,
             concept_uuid,
         )
+        logger.info(
+            "Note: For panel detection, concept_uuid should match the order's concept_id"
+        )
 
         from app.models import (
             Person,
@@ -1476,6 +1479,13 @@ class OrdersCRUD(BaseCRUD[Order]):
         logger.info(
             f"Found order: ID={result[0].order_id}, concept_id={result[0].concept_id}"
         )
+
+        # Check if the concept_uuid matches the order's concept
+        # For panel detection, we need the concept_uuid to match the order's concept_id
+        logger.info(
+            f"Order concept_id: {result[0].concept_id}, Requested concept_uuid: {concept_uuid}"
+        )
+        logger.info("If these don't match, panel detection may not work correctly")
         order = result[0]
 
         # Build orderer info
@@ -2170,9 +2180,11 @@ class OrdersCRUD(BaseCRUD[Order]):
             from sqlalchemy import func, and_
 
             # Get concept members of the panel
+            # Based on SQL query: WHERE cs.concept_set = 24431
+            # So concept_set.concept_set is the panel ID, concept_set.concept_id is the member
             panel_members_query = db.query(
-                ConceptSet.concept_set.label("member_concept_id")
-            ).filter(ConceptSet.concept_id == panel_concept_id)
+                ConceptSet.concept_id.label("member_concept_id")
+            ).filter(ConceptSet.concept_set == panel_concept_id)
 
             panel_member_concept_ids = [
                 row.member_concept_id for row in panel_members_query.all()
@@ -2180,6 +2192,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             logger.info(
                 f"Found {len(panel_member_concept_ids)} concept members in panel {panel_concept_id}"
             )
+            logger.info(f"Panel member concept IDs: {panel_member_concept_ids}")
 
             if not panel_member_concept_ids:
                 logger.warning(f"No concept members found for panel {panel_concept_id}")
