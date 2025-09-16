@@ -998,8 +998,13 @@ class OrdersCRUD(BaseCRUD[Order]):
             # Debug concept_set data
             self.debug_concept_set_data(db, first_row.concept_id)
 
+        # Re-execute the query for processing (since we consumed it above)
+        result_for_processing = execute_enriched_orders_query(
+            db, raw_sql, where_conditions, 0, 1000
+        )
+
         # Process results
-        processed_result = process_expanded_order_results(result)
+        processed_result = process_expanded_order_results(result_for_processing)
 
         if processed_result:
             logger.info(
