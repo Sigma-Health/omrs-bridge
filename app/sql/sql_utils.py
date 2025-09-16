@@ -385,37 +385,23 @@ def process_expanded_order_results(result) -> Dict[str, Any]:
         logger.info("Processing set members for panel concept")
         seen_orders = set()
         for i, row in enumerate(rows):
-            logger.info(
-                f"Row {i}: set_member_order_id={row.set_member_order_id}, set_member_concept_id={row.set_member_concept_id}"
-            )
-            if row.set_member_order_id and row.set_member_order_id not in seen_orders:
-                seen_orders.add(row.set_member_order_id)
-                logger.info(f"Adding set member order: {row.set_member_order_id}")
+            logger.info(f"Row {i}: set_member_concept_id={row.set_member_concept_id}")
+            if (
+                row.set_member_concept_id
+                and row.set_member_concept_id not in seen_orders
+            ):
+                seen_orders.add(row.set_member_concept_id)
+                logger.info(f"Adding set member concept: {row.set_member_concept_id}")
 
-                set_member_order = {
-                    "order_id": row.set_member_order_id,
-                    "uuid": row.set_member_order_uuid,
-                    "order_number": row.set_member_order_number,
-                    "instructions": row.set_member_instructions,
-                    "date_activated": row.set_member_date_activated,
-                    "auto_expire_date": row.set_member_auto_expire_date,
-                    "date_stopped": row.set_member_date_stopped,
-                    "voided": row.set_member_voided,
-                    "urgency": row.set_member_urgency,
-                    "order_action": row.set_member_order_action,
-                    "accession_number": row.set_member_accession_number,
-                    "concept_info": {
-                        "concept_id": row.set_member_concept_id,
-                        "uuid": row.set_member_concept_uuid,
-                        "name": row.set_member_concept_name,
-                        "short_name": row.set_member_concept_short_name,
-                        "description": row.set_member_concept_description,
-                        "is_set": row.set_member_concept_is_set,
-                    }
-                    if row.set_member_concept_id
-                    else None,
+                set_member_concept = {
+                    "concept_id": row.set_member_concept_id,
+                    "uuid": row.set_member_concept_uuid,
+                    "name": row.set_member_concept_name,
+                    "short_name": row.set_member_concept_short_name,
+                    "description": row.set_member_concept_description,
+                    "is_set": row.set_member_concept_is_set,
                 }
-                set_members.append(set_member_order)
+                set_members.append(set_member_concept)
 
     # Process parent concept metadata (if regular concept - is_set=false)
     parent_concept_info = None

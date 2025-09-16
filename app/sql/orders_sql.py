@@ -255,20 +255,7 @@ def get_single_order_with_expansion_sql() -> str:
         cc.name AS concept_class_name,
         cc.description AS concept_class_description,
         
-        -- Set members (if is_set=true) - actual orders that are members of this panel
-        sm_order.order_id AS set_member_order_id,
-        sm_order.uuid AS set_member_order_uuid,
-        sm_order.order_number AS set_member_order_number,
-        sm_order.instructions AS set_member_instructions,
-        sm_order.date_activated AS set_member_date_activated,
-        sm_order.auto_expire_date AS set_member_auto_expire_date,
-        sm_order.date_stopped AS set_member_date_stopped,
-        sm_order.voided AS set_member_voided,
-        sm_order.urgency AS set_member_urgency,
-        sm_order.order_action AS set_member_order_action,
-        sm_order.accession_number AS set_member_accession_number,
-        
-        -- Set member concept information
+        -- Set members (if is_set=true) - concept definitions that are members of this panel
         sm_concept.concept_id AS set_member_concept_id,
         sm_concept.uuid AS set_member_concept_uuid,
         sm_concept.short_name AS set_member_concept_short_name,
@@ -367,20 +354,14 @@ def get_single_order_with_expansion_sql() -> str:
         AND cc.retired = false
     )
 
-    -- Join for set members (if is_set=true) - actual orders that are members of this panel
+    -- Join for set members (if is_set=true) - concept definitions that are members of this panel
     LEFT OUTER JOIN concept_set cs ON (
         cs.concept_set = c.concept_id
         AND c.is_set = 1
     )
     
-    LEFT OUTER JOIN orders sm_order ON (
-        sm_order.concept_id = cs.concept_id
-        AND sm_order.encounter_id = o.encounter_id
-        AND sm_order.voided = false
-    )
-    
     LEFT OUTER JOIN concept sm_concept ON (
-        sm_concept.concept_id = sm_order.concept_id
+        sm_concept.concept_id = cs.concept_id
         AND sm_concept.retired = false
     )
     

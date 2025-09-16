@@ -959,9 +959,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             logger.info(
                 f"First row - order_id: {first_row.order_id}, concept_id: {first_row.concept_id}, is_set: {first_row.concept_is_set}"
             )
-            logger.info(
-                f"Set member order_id: {first_row.set_member_order_id}, set member concept_id: {first_row.set_member_concept_id}"
-            )
+            logger.info(f"Set member concept_id: {first_row.set_member_concept_id}")
             logger.info(f"Parent concept_id: {first_row.parent_concept_id}")
 
             # Debug concept_set data
@@ -993,7 +991,7 @@ class OrdersCRUD(BaseCRUD[Order]):
 
         # Check if concept is a panel (is_set=1)
         concept_query = text(
-            "SELECT concept_id, uuid, name, is_set FROM concept WHERE concept_id = :concept_id"
+            "SELECT concept_id, uuid, short_name, is_set FROM concept WHERE concept_id = :concept_id"
         )
         concept_result = db.execute(
             concept_query, {"concept_id": concept_id}
@@ -1001,13 +999,13 @@ class OrdersCRUD(BaseCRUD[Order]):
 
         if concept_result:
             logger.info(
-                f"Concept: {concept_result.concept_id}, name: {concept_result.name}, is_set: {concept_result.is_set}"
+                f"Concept: {concept_result.concept_id}, short_name: {concept_result.short_name}, is_set: {concept_result.is_set}"
             )
 
             if concept_result.is_set == 1:
                 # Check concept_set table for this panel
                 set_query = text("""
-                    SELECT cs.concept_id, cs.concept_set, c.name as member_name 
+                    SELECT cs.concept_id, cs.concept_set, c.short_name as member_name 
                     FROM concept_set cs 
                     JOIN concept c ON cs.concept_id = c.concept_id 
                     WHERE cs.concept_set = :concept_id
@@ -1026,7 +1024,7 @@ class OrdersCRUD(BaseCRUD[Order]):
                 if set_results:
                     member_concept_ids = [row.concept_id for row in set_results]
                     orders_query = text("""
-                        SELECT o.order_id, o.concept_id, o.encounter_id, c.name as concept_name
+                        SELECT o.order_id, o.concept_id, o.encounter_id, c.short_name as concept_name
                         FROM orders o 
                         JOIN concept c ON o.concept_id = c.concept_id
                         WHERE o.concept_id IN :member_concept_ids AND o.voided = 0
