@@ -5,7 +5,6 @@ from datetime import datetime
 
 from .base import BaseCRUD
 from app.models import Concept
-from app.schemas import ConceptCreate, ConceptUpdate, ConceptReplace
 
 
 class ConceptsCRUD(BaseCRUD[Concept]):
