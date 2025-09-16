@@ -280,6 +280,21 @@ def get_single_order_with_expansion_sql() -> str:
         sm_cc.name AS set_member_concept_class_name,
         sm_cc.description AS set_member_concept_class_description,
         
+        -- Set member concept answer information
+        sm_ca.concept_answer_id AS set_member_concept_answer_id,
+        sm_ca.sort_weight AS set_member_concept_answer_sort_weight,
+        sm_answer_concept.concept_id AS set_member_answer_concept_id,
+        sm_answer_concept.uuid AS set_member_answer_concept_uuid,
+        sm_answer_concept.short_name AS set_member_answer_concept_short_name,
+        sm_answer_concept.description AS set_member_answer_concept_description,
+        sm_answer_concept.is_set AS set_member_answer_concept_is_set,
+        
+        -- Set member answer concept name information
+        sm_answer_cn.concept_name_id AS set_member_answer_concept_name_id,
+        sm_answer_cn.name AS set_member_answer_concept_name,
+        sm_answer_cn.locale AS set_member_answer_concept_name_locale,
+        sm_answer_cn.concept_name_type AS set_member_answer_concept_name_type,
+        
         -- Parent concept metadata (if is_set=false) - metadata about the parent concept
         parent_concept.concept_id AS parent_concept_id,
         parent_concept.uuid AS parent_concept_uuid,
@@ -392,6 +407,23 @@ def get_single_order_with_expansion_sql() -> str:
     LEFT OUTER JOIN concept_class sm_cc ON (
         sm_cc.concept_class_id = sm_concept.class_id
         AND sm_cc.retired = false
+    )
+    
+    LEFT OUTER JOIN concept_answer sm_ca ON (
+        sm_ca.concept_id = sm_concept.concept_id
+        AND sm_ca.retired = false
+    )
+    
+    LEFT OUTER JOIN concept sm_answer_concept ON (
+        sm_answer_concept.concept_id = sm_ca.answer_concept
+        AND sm_answer_concept.retired = false
+    )
+    
+    LEFT OUTER JOIN concept_name sm_answer_cn ON (
+        sm_answer_cn.concept_id = sm_answer_concept.concept_id
+        AND sm_answer_cn.locale = 'en'
+        AND sm_answer_cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND sm_answer_cn.voided = false
     )
 
     -- Join for parent concept metadata (if is_set=false) - metadata about the parent concept

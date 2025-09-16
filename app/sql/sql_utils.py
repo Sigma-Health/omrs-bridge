@@ -383,41 +383,63 @@ def process_expanded_order_results(result) -> Dict[str, Any]:
     logger.info(f"Checking if concept is_set == 1: {main_row.concept_is_set == 1}")
     if main_row.concept_is_set == 1:
         logger.info("Processing set members for panel concept")
-        seen_orders = set()
+
+        # Group rows by set member concept_id to handle multiple answers per concept
+        set_member_data = {}
         for i, row in enumerate(rows):
             logger.info(f"Row {i}: set_member_concept_id={row.set_member_concept_id}")
-            if (
-                row.set_member_concept_id
-                and row.set_member_concept_id not in seen_orders
-            ):
-                seen_orders.add(row.set_member_concept_id)
-                logger.info(f"Adding set member concept: {row.set_member_concept_id}")
+            if row.set_member_concept_id:
+                concept_id = row.set_member_concept_id
 
-                set_member_concept = {
-                    "concept_id": row.set_member_concept_id,
-                    "uuid": row.set_member_concept_uuid,
-                    "name": row.set_member_concept_name,
-                    "short_name": row.set_member_concept_short_name,
-                    "description": row.set_member_concept_description,
-                    "is_set": row.set_member_concept_is_set,
-                    "datatype": {
-                        "concept_datatype_id": row.set_member_concept_datatype_id,
-                        "uuid": row.set_member_concept_datatype_uuid,
-                        "name": row.set_member_concept_datatype_name,
-                        "description": row.set_member_concept_datatype_description,
+                # Initialize concept data if not seen before
+                if concept_id not in set_member_data:
+                    set_member_data[concept_id] = {
+                        "concept_id": concept_id,
+                        "uuid": row.set_member_concept_uuid,
+                        "name": row.set_member_concept_name,
+                        "short_name": row.set_member_concept_short_name,
+                        "description": row.set_member_concept_description,
+                        "is_set": row.set_member_concept_is_set,
+                        "datatype": {
+                            "concept_datatype_id": row.set_member_concept_datatype_id,
+                            "uuid": row.set_member_concept_datatype_uuid,
+                            "name": row.set_member_concept_datatype_name,
+                            "description": row.set_member_concept_datatype_description,
+                        }
+                        if row.set_member_concept_datatype_id
+                        else None,
+                        "concept_class": {
+                            "concept_class_id": row.set_member_concept_class_id,
+                            "uuid": row.set_member_concept_class_uuid,
+                            "name": row.set_member_concept_class_name,
+                            "description": row.set_member_concept_class_description,
+                        }
+                        if row.set_member_concept_class_id
+                        else None,
+                        "answers": [],
                     }
-                    if row.set_member_concept_datatype_id
-                    else None,
-                    "concept_class": {
-                        "concept_class_id": row.set_member_concept_class_id,
-                        "uuid": row.set_member_concept_class_uuid,
-                        "name": row.set_member_concept_class_name,
-                        "description": row.set_member_concept_class_description,
+
+                # Add answer if present
+                if row.set_member_concept_answer_id:
+                    answer = {
+                        "concept_answer_id": row.set_member_concept_answer_id,
+                        "sort_weight": row.set_member_concept_answer_sort_weight,
+                        "answer_concept": {
+                            "concept_id": row.set_member_answer_concept_id,
+                            "uuid": row.set_member_answer_concept_uuid,
+                            "name": row.set_member_answer_concept_name,
+                            "short_name": row.set_member_answer_concept_short_name,
+                            "description": row.set_member_answer_concept_description,
+                            "is_set": row.set_member_answer_concept_is_set,
+                        },
                     }
-                    if row.set_member_concept_class_id
-                    else None,
-                }
-                set_members.append(set_member_concept)
+                    set_member_data[concept_id]["answers"].append(answer)
+
+        # Convert to list and clean up empty answers
+        for concept_data in set_member_data.values():
+            if not concept_data["answers"]:
+                concept_data["answers"] = None
+            set_members.append(concept_data)
 
     # Process parent concept metadata (if regular concept - is_set=false)
     parent_concept_info = None
