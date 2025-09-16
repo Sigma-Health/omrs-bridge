@@ -255,6 +255,21 @@ def get_single_order_with_expansion_sql() -> str:
         cc.name AS concept_class_name,
         cc.description AS concept_class_description,
         
+        -- Main concept answer information
+        ca.concept_answer_id AS concept_answer_id,
+        ca.sort_weight AS concept_answer_sort_weight,
+        answer_concept.concept_id AS answer_concept_id,
+        answer_concept.uuid AS answer_concept_uuid,
+        answer_concept.short_name AS answer_concept_short_name,
+        answer_concept.description AS answer_concept_description,
+        answer_concept.is_set AS answer_concept_is_set,
+        
+        -- Main concept answer name information
+        answer_cn.concept_name_id AS answer_concept_name_id,
+        answer_cn.name AS answer_concept_name,
+        answer_cn.locale AS answer_concept_name_locale,
+        answer_cn.concept_name_type AS answer_concept_name_type,
+        
         -- Set members (if is_set=true) - concept definitions that are members of this panel
         sm_concept.concept_id AS set_member_concept_id,
         sm_concept.uuid AS set_member_concept_uuid,
@@ -379,6 +394,23 @@ def get_single_order_with_expansion_sql() -> str:
     LEFT OUTER JOIN concept_class cc ON (
         cc.concept_class_id = c.class_id
         AND cc.retired = false
+    )
+
+    -- Join for main concept answer information
+    LEFT OUTER JOIN concept_answer ca ON (
+        ca.concept_id = c.concept_id
+    )
+    
+    LEFT OUTER JOIN concept answer_concept ON (
+        answer_concept.concept_id = ca.answer_concept
+        AND answer_concept.retired = false
+    )
+    
+    LEFT OUTER JOIN concept_name answer_cn ON (
+        answer_cn.concept_id = answer_concept.concept_id
+        AND answer_cn.locale = 'en'
+        AND answer_cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND answer_cn.voided = false
     )
 
     -- Join for set members (if is_set=true) - concept definitions that are members of this panel

@@ -348,6 +348,24 @@ def process_expanded_order_results(result) -> Dict[str, Any]:
     # Build enriched concept info with additional metadata
     concept_info = None
     if main_row.concept_id:
+        # Collect answers for main concept
+        main_concept_answers = []
+        for row in rows:
+            if row.concept_answer_id:
+                answer = {
+                    "concept_answer_id": row.concept_answer_id,
+                    "sort_weight": row.concept_answer_sort_weight,
+                    "answer_concept": {
+                        "concept_id": row.answer_concept_id,
+                        "uuid": row.answer_concept_uuid,
+                        "name": row.answer_concept_name,
+                        "short_name": row.answer_concept_short_name,
+                        "description": row.answer_concept_description,
+                        "is_set": row.answer_concept_is_set,
+                    },
+                }
+                main_concept_answers.append(answer)
+
         concept_info = {
             "concept_id": main_row.concept_id,
             "uuid": main_row.concept_uuid,
@@ -371,6 +389,7 @@ def process_expanded_order_results(result) -> Dict[str, Any]:
             }
             if main_row.concept_class_id
             else None,
+            "answers": main_concept_answers if main_concept_answers else None,
         }
 
     # Add enriched information to order
