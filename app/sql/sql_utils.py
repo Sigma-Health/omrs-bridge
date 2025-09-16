@@ -73,8 +73,13 @@ def execute_enriched_orders_query(
     Returns:
         SQLAlchemy result object
     """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     # Build WHERE clause
     where_clause = build_where_clause(conditions)
+    logger.info(f"Generated WHERE clause: {where_clause}")
 
     # Replace placeholder in SQL template
     sql = sql_template.format(where_clause=where_clause)
@@ -82,6 +87,10 @@ def execute_enriched_orders_query(
     # Prepare parameters (include pagination)
     params = conditions.copy()
     params.update({"limit": limit, "skip": skip})
+    logger.info(f"SQL parameters: {params}")
+
+    # Log first 500 characters of SQL for debugging
+    logger.info(f"Generated SQL (first 500 chars): {sql[:500]}...")
 
     # Execute query
     return db.execute(text(sql), params)
@@ -220,12 +229,22 @@ def process_expanded_order_results(result) -> Dict[str, Any]:
     Returns:
         Dictionary with main order, set_members (if panel), and parent_concept (if regular)
     """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     rows = list(result)
+    logger.info(f"Processing {len(rows)} rows for expanded order results")
+
     if not rows:
+        logger.warning("No rows returned from SQL query")
         return None
 
     # Get the first row for main order data
     main_row = rows[0]
+    logger.info(
+        f"Main row - order_id: {main_row.order_id}, concept_id: {main_row.concept_id}, is_set: {main_row.concept_is_set}"
+    )
 
     # Build main order dictionary (same as process_raw_query_results)
     order_dict = {
@@ -361,11 +380,17 @@ def process_expanded_order_results(result) -> Dict[str, Any]:
 
     # Process set members (if panel - is_set=true)
     set_members = []
+    logger.info(f"Checking if concept is_set == 1: {main_row.concept_is_set == 1}")
     if main_row.concept_is_set == 1:
+        logger.info("Processing set members for panel concept")
         seen_orders = set()
-        for row in rows:
+        for i, row in enumerate(rows):
+            logger.info(
+                f"Row {i}: set_member_order_id={row.set_member_order_id}, set_member_concept_id={row.set_member_concept_id}"
+            )
             if row.set_member_order_id and row.set_member_order_id not in seen_orders:
                 seen_orders.add(row.set_member_order_id)
+                logger.info(f"Adding set member order: {row.set_member_order_id}")
 
                 set_member_order = {
                     "order_id": row.set_member_order_id,
@@ -426,5 +451,9 @@ def process_expanded_order_results(result) -> Dict[str, Any]:
         "set_members": set_members if set_members else None,
         "parent_concept": parent_concept_info,
     }
+
+    logger.info(
+        f"Final result - set_members count: {len(set_members)}, parent_concept: {parent_concept_info is not None}"
+    )
 
     return result_dict

@@ -931,6 +931,10 @@ class OrdersCRUD(BaseCRUD[Order]):
         if not order_id and not order_uuid:
             raise ValueError("Either order_id or order_uuid must be provided")
 
+        logger.info(
+            f"Getting order with expansion - order_id: {order_id}, order_uuid: {order_uuid}"
+        )
+
         # Get the SQL query
         raw_sql = get_single_order_with_expansion_sql()
 
@@ -941,11 +945,107 @@ class OrdersCRUD(BaseCRUD[Order]):
         elif order_uuid:
             where_conditions["order_uuid"] = order_uuid
 
+        logger.info(f"WHERE conditions: {where_conditions}")
+
         # Execute query (no pagination for single order)
         result = execute_enriched_orders_query(db, raw_sql, where_conditions, 0, 1000)
 
+        # Log raw result count
+        rows = list(result)
+        logger.info(f"Raw SQL result: {len(rows)} rows returned")
+
+        if rows:
+            first_row = rows[0]
+            logger.info(
+                f"First row - order_id: {first_row.order_id}, concept_id: {first_row.concept_id}, is_set: {first_row.concept_is_set}"
+            )
+            logger.info(
+                f"Set member order_id: {first_row.set_member_order_id}, set member concept_id: {first_row.set_member_concept_id}"
+            )
+            logger.info(f"Parent concept_id: {first_row.parent_concept_id}")
+
+            # Debug concept_set data
+            self.debug_concept_set_data(db, first_row.concept_id)
+
         # Process results
-        return process_expanded_order_results(result)
+        processed_result = process_expanded_order_results(result)
+
+        if processed_result:
+            logger.info(
+                f"Processed result - order_id: {processed_result['order']['order_id']}"
+            )
+            logger.info(
+                f"Set members count: {len(processed_result['set_members']) if processed_result['set_members'] else 0}"
+            )
+            logger.info(
+                f"Parent concept: {processed_result['parent_concept'] is not None}"
+            )
+
+        return processed_result
+
+    def debug_concept_set_data(self, db: Session, concept_id: int):
+        """
+        Debug function to check concept_set table data for a given concept.
+        """
+        from sqlalchemy import text
+
+        logger.info(f"Debugging concept_set data for concept_id: {concept_id}")
+
+        # Check if concept is a panel (is_set=1)
+        concept_query = text(
+            "SELECT concept_id, uuid, name, is_set FROM concept WHERE concept_id = :concept_id"
+        )
+        concept_result = db.execute(
+            concept_query, {"concept_id": concept_id}
+        ).fetchone()
+
+        if concept_result:
+            logger.info(
+                f"Concept: {concept_result.concept_id}, name: {concept_result.name}, is_set: {concept_result.is_set}"
+            )
+
+            if concept_result.is_set == 1:
+                # Check concept_set table for this panel
+                set_query = text("""
+                    SELECT cs.concept_id, cs.concept_set, c.name as member_name 
+                    FROM concept_set cs 
+                    JOIN concept c ON cs.concept_id = c.concept_id 
+                    WHERE cs.concept_set = :concept_id
+                """)
+                set_results = db.execute(
+                    set_query, {"concept_id": concept_id}
+                ).fetchall()
+
+                logger.info(f"Found {len(set_results)} set members:")
+                for row in set_results:
+                    logger.info(
+                        f"  Member concept_id: {row.concept_id}, name: {row.member_name}"
+                    )
+
+                # Check if there are orders for these member concepts
+                if set_results:
+                    member_concept_ids = [row.concept_id for row in set_results]
+                    orders_query = text("""
+                        SELECT o.order_id, o.concept_id, o.encounter_id, c.name as concept_name
+                        FROM orders o 
+                        JOIN concept c ON o.concept_id = c.concept_id
+                        WHERE o.concept_id IN :member_concept_ids AND o.voided = 0
+                    """)
+                    orders_result = db.execute(
+                        orders_query, {"member_concept_ids": tuple(member_concept_ids)}
+                    ).fetchall()
+
+                    logger.info(
+                        f"Found {len(orders_result)} orders for member concepts:"
+                    )
+                    for row in orders_result:
+                        logger.info(
+                            f"  Order: {row.order_id}, concept: {row.concept_id} ({row.concept_name}), encounter: {row.encounter_id}"
+                        )
+            else:
+                logger.info("Concept is not a panel (is_set=0)")
+        else:
+            logger.warning(f"Concept {concept_id} not found")
 
 
 # Create instance
