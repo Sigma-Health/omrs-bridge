@@ -908,7 +908,7 @@ async def get_orders_by_type_and_visit_uuid(
                 detail="Invalid visit UUID format",
             )
 
-        return orders.get_orders_by_type_and_visit_uuid(
+        return orders.get_orders_by_type_and_visit_uuidx(
             db,
             order_type_id=order_type_id,
             visit_uuid=visit_uuid,
@@ -1002,46 +1002,6 @@ async def get_orders_by_visit_uuid(
         raise
     except Exception as e:
         logger.error(f"Error getting orders for visit UUID {visit_uuid}: {str(e)}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to get orders: {str(e)}",
-        )
-
-
-@router.get(
-    "/type/{order_type_id}/visit/uuid/{visit_uuid}",
-    response_model=List[OrderResponse],
-)
-async def get_orders_by_type_and_visit_uuidx(
-    order_type_id: int = Path(..., description="Order type ID"),
-    visit_uuid: str = Path(..., description="Visit UUID"),
-    skip: int = Query(0, ge=0, description="# of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="# of records to return"),
-    db: Session = Depends(get_db),
-    api_key: str = Depends(get_current_api_key),
-):
-    """
-    Get all orders of a specific order type for a particular visit
-    Use visit UUID to get orders
-    """
-    try:
-        # Validate UUID format
-        if not validate_uuid(visit_uuid):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid visit UUID format",
-            )
-
-        return orders.get_orders_by_type_and_visit_uuidx(
-            db,
-            order_type_id=order_type_id,
-            visit_uuid=visit_uuid,
-            skip=skip,
-            limit=limit,
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
         raise HTTPException(
             status_code=400,
             detail=f"Failed to get orders: {str(e)}",
