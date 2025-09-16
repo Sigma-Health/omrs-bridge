@@ -891,8 +891,8 @@ async def get_orders_by_type_and_visit_id(
 async def get_orders_by_type_and_visit_uuid(
     order_type_id: int = Path(..., description="Order type ID"),
     visit_uuid: str = Path(..., description="Visit UUID"),
-    skip: int = Query(0, ge=0, description="# of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="# of records to return"),
+    skip: int = Query(0, ge=0, description="no. of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="no. of records to return"),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):

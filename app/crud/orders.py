@@ -763,146 +763,146 @@ class OrdersCRUD(BaseCRUD[Order]):
         else:
             return "ACTIVE"
 
+    def get_orders_by_type_and_visit_uuidx(
+        self,
+        db: Session,
+        order_type_id: int,
+        visit_uuid: str,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get orders by order type and visit UUID using raw SQL query.
+        """
+        # Get the reusable SQL query
+        raw_sql = get_orders_with_enrichment_sql()
 
-def get_orders_by_type_and_visit_uuidx(
-    self,
-    db: Session,
-    order_type_id: int,
-    visit_uuid: str,
-    skip: int = 0,
-    limit: int = 100,
-) -> List[Dict[str, Any]]:
-    """
-    Get orders by order type and visit UUID using raw SQL query.
-    """
-    # Get the reusable SQL query
-    raw_sql = get_orders_with_enrichment_sql()
+        # Define WHERE conditions
+        where_conditions = {
+            "order_type_id": order_type_id,
+            "visit_uuid": visit_uuid,
+            "voided": False,
+        }
 
-    # Define WHERE conditions
-    where_conditions = {
-        "order_type_id": order_type_id,
-        "visit_uuid": visit_uuid,
-        "voided": False,
-    }
+        # Execute raw SQL query
+        result = execute_enriched_orders_query(
+            db,
+            raw_sql,
+            where_conditions,
+            skip,
+            limit,
+        )
 
-    # Execute raw SQL query
-    result = execute_enriched_orders_query(
-        db,
-        raw_sql,
-        where_conditions,
-        skip,
-        limit,
-    )
+        return process_raw_query_results(result)
 
-    return process_raw_query_results(result)
+    # Old method definitions removed - now using app/sql modules
+    # All SQL utilities moved to app/sql/sql_utils.py
+    # All SQL queries moved to app/sql/orders_sql.py
 
+    def get_orders_by_patient_id(
+        self,
+        db: Session,
+        patient_id: int,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get orders by patient ID using reusable SQL components.
+        """
+        # Get the reusable SQL query
+        raw_sql = get_orders_with_enrichment_sql()
 
-# Old method definitions removed - now using app/sql modules
-# All SQL utilities moved to app/sql/sql_utils.py
-# All SQL queries moved to app/sql/orders_sql.py
+        # Define WHERE conditions
+        where_conditions = {"patient_id": patient_id, "voided": False}
 
+        # Execute raw SQL query
+        result = execute_enriched_orders_query(
+            db, raw_sql, where_conditions, skip, limit
+        )
 
-def get_orders_by_patient_id(
-    self,
-    db: Session,
-    patient_id: int,
-    skip: int = 0,
-    limit: int = 100,
-) -> List[Dict[str, Any]]:
-    """
-    Get orders by patient ID using reusable SQL components.
-    """
-    # Get the reusable SQL query
-    raw_sql = get_orders_with_enrichment_sql()
+        return process_raw_query_results(result)
 
-    # Define WHERE conditions
-    where_conditions = {"patient_id": patient_id, "voided": False}
+    def get_orders_by_encounter_id(
+        self,
+        db: Session,
+        encounter_id: int,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get orders by encounter ID using reusable SQL components.
+        """
+        # Get the reusable SQL query
+        raw_sql = get_orders_with_enrichment_sql()
 
-    # Execute raw SQL query
-    result = execute_enriched_orders_query(db, raw_sql, where_conditions, skip, limit)
+        # Define WHERE conditions
+        where_conditions = {"encounter_id": encounter_id, "voided": False}
 
-    return process_raw_query_results(result)
+        # Execute raw SQL query
+        result = execute_enriched_orders_query(
+            db, raw_sql, where_conditions, skip, limit
+        )
 
+        return process_raw_query_results(result)
 
-def get_orders_by_encounter_id(
-    self,
-    db: Session,
-    encounter_id: int,
-    skip: int = 0,
-    limit: int = 100,
-) -> List[Dict[str, Any]]:
-    """
-    Get orders by encounter ID using reusable SQL components.
-    """
-    # Get the reusable SQL query
-    raw_sql = get_orders_with_enrichment_sql()
+    def get_orders_by_date_range(
+        self,
+        db: Session,
+        date_from: str,
+        date_to: str,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get orders by date range using reusable SQL components.
+        """
+        # Get the reusable SQL query
+        raw_sql = get_orders_with_enrichment_sql()
 
-    # Define WHERE conditions
-    where_conditions = {"encounter_id": encounter_id, "voided": False}
+        # Define WHERE conditions
+        where_conditions = {
+            "date_activated_from": date_from,
+            "date_activated_to": date_to,
+            "voided": False,
+        }
 
-    # Execute raw SQL query
-    result = execute_enriched_orders_query(db, raw_sql, where_conditions, skip, limit)
+        # Execute raw SQL query
+        result = execute_enriched_orders_query(
+            db, raw_sql, where_conditions, skip, limit
+        )
 
-    return process_raw_query_results(result)
+        return process_raw_query_results(result)
 
+    def get_orders_by_custom_conditions(
+        self,
+        db: Session,
+        conditions: Dict[str, Any],
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get orders by custom conditions using reusable SQL components.
 
-def get_orders_by_date_range(
-    self,
-    db: Session,
-    date_from: str,
-    date_to: str,
-    skip: int = 0,
-    limit: int = 100,
-) -> List[Dict[str, Any]]:
-    """
-    Get orders by date range using reusable SQL components.
-    """
-    # Get the reusable SQL query
-    raw_sql = get_orders_with_enrichment_sql()
+        Args:
+            db: Database session
+            conditions: Dictionary of WHERE conditions (e.g., {"order_type_id": 4, "patient_id": 85})
+            skip: Number of records to skip
+            limit: Maximum number of records to return
 
-    # Define WHERE conditions
-    where_conditions = {
-        "date_activated_from": date_from,
-        "date_activated_to": date_to,
-        "voided": False,
-    }
+        Returns:
+            List of enriched order dictionaries
+        """
+        # Get the reusable SQL query
+        raw_sql = get_orders_with_enrichment_sql()
 
-    # Execute raw SQL query
-    result = execute_enriched_orders_query(db, raw_sql, where_conditions, skip, limit)
+        # Add default voided condition if not provided
+        if "voided" not in conditions:
+            conditions["voided"] = False
 
-    return process_raw_query_results(result)
+        # Execute raw SQL query
+        result = execute_enriched_orders_query(db, raw_sql, conditions, skip, limit)
 
-
-def get_orders_by_custom_conditions(
-    self,
-    db: Session,
-    conditions: Dict[str, Any],
-    skip: int = 0,
-    limit: int = 100,
-) -> List[Dict[str, Any]]:
-    """
-    Get orders by custom conditions using reusable SQL components.
-
-    Args:
-        db: Database session
-        conditions: Dictionary of WHERE conditions (e.g., {"order_type_id": 4, "patient_id": 85})
-        skip: Number of records to skip
-        limit: Maximum number of records to return
-
-    Returns:
-        List of enriched order dictionaries
-    """
-    # Get the reusable SQL query
-    raw_sql = get_orders_with_enrichment_sql()
-
-    # Add default voided condition if not provided
-    if "voided" not in conditions:
-        conditions["voided"] = False
-
-    # Execute raw SQL query
-    result = execute_enriched_orders_query(db, raw_sql, conditions, skip, limit)
-
-    return process_raw_query_results(result)
+        return process_raw_query_results(result)
 
 
 # Create instance
