@@ -48,6 +48,10 @@ class DiagnosesCRUD:
         if "visit_id" in filters:
             where_conditions.append("v.visit_id = :visit_id")
             params["visit_id"] = filters["visit_id"]
+            
+        if "visit_uuid" in filters:
+            where_conditions.append("v.uuid = :visit_uuid")
+            params["visit_uuid"] = filters["visit_uuid"]
 
         if "patient_id" in filters:
             where_conditions.append("p.patient_id = :patient_id")
@@ -124,6 +128,36 @@ class DiagnosesCRUD:
             diagnoses=diagnoses,
             total_count=len(diagnoses),
         )
+
+    def get_diagnoses_by_visit_uuid(
+        self, db: Session, visit_uuid: str, skip: int = 0, limit: int = 100
+    ) -> VisitDiagnoses:
+        """
+        Get diagnoses for a specific visit by visit UUID.
+
+        Args:
+            db: Database session
+            visit_uuid: UUID of the visit
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            VisitDiagnoses with visit info and diagnoses
+        """
+        # First get the visit_id from the UUID
+        visit_query = """
+        SELECT visit_id FROM visit WHERE uuid = :visit_uuid AND voided = 0
+        """
+        result = db.execute(text(visit_query), {"visit_uuid": visit_uuid})
+        visit_row = result.fetchone()
+        
+        if not visit_row:
+            raise ValueError(f"Visit with UUID {visit_uuid} not found")
+        
+        visit_id = visit_row[0]
+        
+        # Use the existing method with visit_id
+        return self.get_diagnoses_by_visit(db=db, visit_id=visit_id, skip=skip, limit=limit)
 
     def _process_diagnosis_results(self, result) -> List[DiagnosisObservation]:
         """

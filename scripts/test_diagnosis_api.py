@@ -66,7 +66,7 @@ def test_diagnosis_endpoints():
     
     print()
     
-    # Test 3: Get diagnoses for a specific visit
+    # Test 3: Get diagnoses for a specific visit by ID
     print("3. Testing GET /api/v1/diagnoses/visit/1")
     try:
         response = requests.get(f"{API_BASE_URL}/api/v1/diagnoses/visit/1", headers=headers)
@@ -74,6 +74,21 @@ def test_diagnosis_endpoints():
         if response.status_code == 200:
             data = response.json()
             print(f"   Visit diagnoses: {data.get('total_count', 0)}")
+        else:
+            print(f"   Error: {response.text}")
+    except Exception as e:
+        print(f"   Error: {e}")
+    
+    print()
+    
+    # Test 3b: Get diagnoses for a specific visit by UUID
+    print("3b. Testing GET /api/v1/diagnoses/visit/uuid/sample-uuid")
+    try:
+        response = requests.get(f"{API_BASE_URL}/api/v1/diagnoses/visit/uuid/sample-uuid", headers=headers)
+        print(f"   Status: {response.status_code}")
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Visit diagnoses by UUID: {data.get('total_count', 0)}")
         else:
             print(f"   Error: {response.text}")
     except Exception as e:

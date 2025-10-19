@@ -18,6 +18,7 @@ async def get_diagnoses(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
     visit_id: Optional[int] = Query(None, description="Filter by visit ID"),
+    visit_uuid: Optional[str] = Query(None, description="Filter by visit UUID"),
     patient_id: Optional[int] = Query(None, description="Filter by patient ID"),
     encounter_id: Optional[int] = Query(None, description="Filter by encounter ID"),
     concept_id: Optional[int] = Query(None, description="Filter by concept ID"),
@@ -34,7 +35,8 @@ async def get_diagnoses(
     Get diagnoses with reference codes (ICD10, CIEL, IMO, etc.).
 
     Supports filtering by:
-    - visit_id: Get diagnoses for a specific visit
+    - visit_id: Get diagnoses for a specific visit by ID
+    - visit_uuid: Get diagnoses for a specific visit by UUID
     - patient_id: Get diagnoses for a specific patient
     - encounter_id: Get diagnoses for a specific encounter
     - concept_id: Get diagnoses for a specific concept
@@ -46,6 +48,8 @@ async def get_diagnoses(
         filters = {}
         if visit_id is not None:
             filters["visit_id"] = visit_id
+        if visit_uuid is not None:
+            filters["visit_uuid"] = visit_uuid
         if patient_id is not None:
             filters["patient_id"] = patient_id
         if encounter_id is not None:
@@ -66,7 +70,7 @@ async def get_diagnoses(
 
 
 @router.get("/visit/{visit_id}", response_model=VisitDiagnoses)
-async def get_diagnoses_by_visit(
+async def get_diagnoses_by_visit_id(
     visit_id: int = Path(..., description="Visit ID"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
@@ -74,7 +78,7 @@ async def get_diagnoses_by_visit(
     api_key: str = Depends(get_current_api_key),
 ):
     """
-    Get diagnoses for a specific visit with ICD10 codes.
+    Get diagnoses for a specific visit by visit ID.
     """
     try:
         result = diagnoses.get_diagnoses_by_visit(
@@ -85,6 +89,29 @@ async def get_diagnoses_by_visit(
         raise HTTPException(
             status_code=400,
             detail=f"Failed to get diagnoses for visit {visit_id}: {str(e)}",
+        )
+
+
+@router.get("/visit/uuid/{visit_uuid}", response_model=VisitDiagnoses)
+async def get_diagnoses_by_visit_uuid(
+    visit_uuid: str = Path(..., description="Visit UUID"),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Get diagnoses for a specific visit by visit UUID.
+    """
+    try:
+        result = diagnoses.get_diagnoses_by_visit_uuid(
+            db=db, visit_uuid=visit_uuid, skip=skip, limit=limit
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to get diagnoses for visit UUID {visit_uuid}: {str(e)}",
         )
 
 
