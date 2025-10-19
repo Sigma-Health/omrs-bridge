@@ -88,7 +88,6 @@ def get_diagnoses_with_icd10_sql() -> str:
     
     -- Join with ICD10 mapping
     LEFT JOIN concept_reference_map crm ON c.concept_id = crm.concept_id
-        AND crm.voided = 0
     LEFT JOIN concept_reference_term crt ON crm.concept_reference_term_id = crt.concept_reference_term_id
         AND crt.retired = 0
     LEFT JOIN concept_reference_source crs ON crt.concept_source_id = crs.concept_source_id
@@ -188,7 +187,6 @@ def get_diagnoses_by_visit_sql() -> str:
     
     -- Join with ICD10 mapping
     LEFT JOIN concept_reference_map crm ON c.concept_id = crm.concept_id
-        AND crm.voided = 0
     LEFT JOIN concept_reference_term crt ON crm.concept_reference_term_id = crt.concept_reference_term_id
         AND crt.retired = 0
     LEFT JOIN concept_reference_source crs ON crt.concept_source_id = crs.concept_source_id
@@ -215,7 +213,6 @@ def get_diagnoses_count_sql() -> str:
     INNER JOIN visit v ON e.visit_id = v.visit_id
     INNER JOIN concept c ON o.value_coded = c.concept_id
     LEFT JOIN concept_reference_map crm ON c.concept_id = crm.concept_id
-        AND crm.voided = 0
     LEFT JOIN concept_reference_term crt ON crm.concept_reference_term_id = crt.concept_reference_term_id
         AND crt.retired = 0
     LEFT JOIN concept_reference_source crs ON crt.concept_source_id = crs.concept_source_id
