@@ -14,10 +14,10 @@ from .concept import (
     ConceptUpdateResponse,
 )
 from .diagnosis import (
-    DiagnosisObservation,
-    VisitDiagnoses,
+    DiagnosisObservation, 
+    VisitDiagnoses, 
     DiagnosisResponse,
-    ICD10Code,
+    ReferenceCode,
     DiagnosisConcept,
     PatientInfo as DiagnosisPatientInfo,
     EncounterInfo,
@@ -101,7 +101,7 @@ __all__ = [
     "DiagnosisObservation",
     "VisitDiagnoses",
     "DiagnosisResponse",
-    "ICD10Code",
+    "ReferenceCode",
     "DiagnosisConcept",
     "DiagnosisPatientInfo",
     "EncounterInfo",

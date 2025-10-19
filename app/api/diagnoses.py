@@ -21,21 +21,25 @@ async def get_diagnoses(
     patient_id: Optional[int] = Query(None, description="Filter by patient ID"),
     encounter_id: Optional[int] = Query(None, description="Filter by encounter ID"),
     concept_id: Optional[int] = Query(None, description="Filter by concept ID"),
-    has_icd10: Optional[bool] = Query(
-        None, description="Filter for diagnoses with ICD10 codes"
+    has_reference_codes: Optional[bool] = Query(
+        None, description="Filter for diagnoses with reference codes"
+    ),
+    source_name: Optional[str] = Query(
+        None, description="Filter by reference source name (e.g., 'ICD-10', 'CIEL', 'IMO-ProblemIT')"
     ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
     """
-    Get diagnoses with ICD10 codes.
+    Get diagnoses with reference codes (ICD10, CIEL, IMO, etc.).
 
     Supports filtering by:
     - visit_id: Get diagnoses for a specific visit
     - patient_id: Get diagnoses for a specific patient
     - encounter_id: Get diagnoses for a specific encounter
     - concept_id: Get diagnoses for a specific concept
-    - has_icd10: Filter for diagnoses that have ICD10 codes
+    - has_reference_codes: Filter for diagnoses that have reference codes
+    - source_name: Filter by reference source name (e.g., 'ICD-10', 'CIEL', 'IMO-ProblemIT')
     """
     try:
         # Build filters
@@ -48,8 +52,10 @@ async def get_diagnoses(
             filters["encounter_id"] = encounter_id
         if concept_id is not None:
             filters["concept_id"] = concept_id
-        if has_icd10 is not None:
-            filters["has_icd10"] = has_icd10
+        if has_reference_codes is not None:
+            filters["has_reference_codes"] = has_reference_codes
+        if source_name is not None:
+            filters["source_name"] = source_name
 
         result = diagnoses.get_diagnoses(db=db, skip=skip, limit=limit, **filters)
         return result

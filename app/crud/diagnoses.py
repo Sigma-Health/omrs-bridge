@@ -14,7 +14,7 @@ from app.schemas.diagnosis import (
     DiagnosisObservation,
     DiagnosisResponse,
     VisitDiagnoses,
-    ICD10Code,
+    ReferenceCode,
     DiagnosisConcept,
     PatientInfo,
     EncounterInfo,
@@ -61,8 +61,12 @@ class DiagnosesCRUD:
             where_conditions.append("c.concept_id = :concept_id")
             params["concept_id"] = filters["concept_id"]
 
-        if "has_icd10" in filters and filters["has_icd10"]:
+        if "has_reference_codes" in filters and filters["has_reference_codes"]:
             where_conditions.append("crt.code IS NOT NULL")
+            
+        if "source_name" in filters:
+            where_conditions.append("crs.name = :source_name")
+            params["source_name"] = filters["source_name"]
 
         where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
 
@@ -147,15 +151,18 @@ class DiagnosesCRUD:
                 " ".join(patient_name_parts) if patient_name_parts else "Unknown"
             )
 
-            # Build ICD10 codes
-            icd10_codes = []
-            if row.icd10_code:
-                icd10_codes.append(
-                    ICD10Code(
-                        code=row.icd10_code,
-                        name=row.icd10_name,
-                        version=row.icd10_version,
-                        description=row.icd10_description,
+            # Build reference codes
+            reference_codes = []
+            if row.reference_code:
+                reference_codes.append(
+                    ReferenceCode(
+                        code=row.reference_code,
+                        name=row.reference_name,
+                        version=row.reference_version,
+                        description=row.reference_description,
+                        source_name=row.reference_source_name,
+                        source_description=row.reference_source_description,
+                        hl7_code=row.reference_hl7_code,
                     )
                 )
 
@@ -166,7 +173,7 @@ class DiagnosesCRUD:
                 name=row.diagnosis_name,
                 short_name=row.concept_short_name,
                 description=row.concept_description,
-                icd10_codes=icd10_codes if icd10_codes else None,
+                reference_codes=reference_codes if reference_codes else None,
             )
 
             # Build patient info

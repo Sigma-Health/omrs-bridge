@@ -7,13 +7,16 @@ from typing import Optional, List
 from datetime import datetime
 
 
-class ICD10Code(BaseModel):
-    """ICD10 code information"""
+class ReferenceCode(BaseModel):
+    """Reference code information (ICD10, CIEL, IMO, etc.)"""
 
     code: str
     name: Optional[str] = None
     version: Optional[str] = None
     description: Optional[str] = None
+    source_name: Optional[str] = None
+    source_description: Optional[str] = None
+    hl7_code: Optional[str] = None
 
 
 class DiagnosisConcept(BaseModel):
@@ -24,7 +27,7 @@ class DiagnosisConcept(BaseModel):
     name: str
     short_name: Optional[str] = None
     description: Optional[str] = None
-    icd10_codes: Optional[List[ICD10Code]] = None
+    reference_codes: Optional[List[ReferenceCode]] = None
 
 
 class PatientInfo(BaseModel):

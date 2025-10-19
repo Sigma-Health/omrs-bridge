@@ -53,14 +53,14 @@ def get_diagnoses_with_icd10_sql() -> str:
         cn.locale AS concept_name_locale,
         cn.concept_name_type,
         
-        -- ICD10 code information
-        crt.code AS icd10_code,
-        crt.name AS icd10_name,
-        crt.version AS icd10_version,
-        crt.description AS icd10_description,
-        crs.name AS icd10_source_name,
-        crs.description AS icd10_source_description,
-        crs.hl7_code AS icd10_hl7_code
+        -- Reference code information
+        crt.code AS reference_code,
+        crt.name AS reference_name,
+        crt.version AS reference_version,
+        crt.description AS reference_description,
+        crs.name AS reference_source_name,
+        crs.description AS reference_source_description,
+        crs.hl7_code AS reference_hl7_code
 
     FROM obs o
     
@@ -86,13 +86,12 @@ def get_diagnoses_with_icd10_sql() -> str:
         AND cn.concept_name_type = 'FULLY_SPECIFIED'
         AND cn.voided = 0
     
-    -- Join with ICD10 mapping
+    -- Join with reference code mapping
     LEFT JOIN concept_reference_map crm ON c.concept_id = crm.concept_id
     LEFT JOIN concept_reference_term crt ON crm.concept_reference_term_id = crt.concept_reference_term_id
         AND crt.retired = 0
     LEFT JOIN concept_reference_source crs ON crt.concept_source_id = crs.concept_source_id
         AND crs.retired = 0
-        AND (crs.name LIKE '%ICD-10%' OR crs.name LIKE '%ICD10%' OR crs.hl7_code = 'ICD-10')
 
     WHERE o.voided = 0
         AND o.value_coded IS NOT NULL
@@ -152,14 +151,14 @@ def get_diagnoses_by_visit_sql() -> str:
         cn.locale AS concept_name_locale,
         cn.concept_name_type,
         
-        -- ICD10 code information
-        crt.code AS icd10_code,
-        crt.name AS icd10_name,
-        crt.version AS icd10_version,
-        crt.description AS icd10_description,
-        crs.name AS icd10_source_name,
-        crs.description AS icd10_source_description,
-        crs.hl7_code AS icd10_hl7_code
+        -- Reference code information
+        crt.code AS reference_code,
+        crt.name AS reference_name,
+        crt.version AS reference_version,
+        crt.description AS reference_description,
+        crs.name AS reference_source_name,
+        crs.description AS reference_source_description,
+        crs.hl7_code AS reference_hl7_code
 
     FROM obs o
     
@@ -185,13 +184,12 @@ def get_diagnoses_by_visit_sql() -> str:
         AND cn.concept_name_type = 'FULLY_SPECIFIED'
         AND cn.voided = 0
     
-    -- Join with ICD10 mapping
+    -- Join with reference code mapping
     LEFT JOIN concept_reference_map crm ON c.concept_id = crm.concept_id
     LEFT JOIN concept_reference_term crt ON crm.concept_reference_term_id = crt.concept_reference_term_id
         AND crt.retired = 0
     LEFT JOIN concept_reference_source crs ON crt.concept_source_id = crs.concept_source_id
         AND crs.retired = 0
-        AND (crs.name LIKE '%ICD-10%' OR crs.name LIKE '%ICD10%' OR crs.hl7_code = 'ICD-10')
 
     WHERE o.voided = 0
         AND o.value_coded IS NOT NULL

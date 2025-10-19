@@ -36,14 +36,29 @@ def test_diagnosis_endpoints():
     
     print()
     
-    # Test 2: Get diagnoses with ICD10 filter
-    print("2. Testing GET /api/v1/diagnoses/?has_icd10=true")
+    # Test 2: Get diagnoses with reference codes filter
+    print("2. Testing GET /api/v1/diagnoses/?has_reference_codes=true")
     try:
-        response = requests.get(f"{API_BASE_URL}/api/v1/diagnoses/?has_icd10=true", headers=headers)
+        response = requests.get(f"{API_BASE_URL}/api/v1/diagnoses/?has_reference_codes=true", headers=headers)
         print(f"   Status: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
-            print(f"   Diagnoses with ICD10: {data.get('total_count', 0)}")
+            print(f"   Diagnoses with reference codes: {data.get('total_count', 0)}")
+        else:
+            print(f"   Error: {response.text}")
+    except Exception as e:
+        print(f"   Error: {e}")
+    
+    print()
+    
+    # Test 2b: Get diagnoses with specific source filter
+    print("2b. Testing GET /api/v1/diagnoses/?source_name=ICD-10")
+    try:
+        response = requests.get(f"{API_BASE_URL}/api/v1/diagnoses/?source_name=ICD-10", headers=headers)
+        print(f"   Status: {response.status_code}")
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Diagnoses with ICD-10 codes: {data.get('total_count', 0)}")
         else:
             print(f"   Error: {response.text}")
     except Exception as e:
