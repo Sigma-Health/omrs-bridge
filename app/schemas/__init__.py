@@ -13,6 +13,15 @@ from .concept import (
     ConceptResponse,
     ConceptUpdateResponse,
 )
+from .diagnosis import (
+    DiagnosisObservation,
+    VisitDiagnoses,
+    DiagnosisResponse,
+    ICD10Code,
+    DiagnosisConcept,
+    PatientInfo as DiagnosisPatientInfo,
+    EncounterInfo,
+)
 from .encounter import (
     EncounterBase,
     EncounterCreate,
@@ -88,6 +97,14 @@ __all__ = [
     "ConceptReplace",
     "ConceptResponse",
     "ConceptUpdateResponse",
+    # Diagnosis
+    "DiagnosisObservation",
+    "VisitDiagnoses",
+    "DiagnosisResponse",
+    "ICD10Code",
+    "DiagnosisConcept",
+    "DiagnosisPatientInfo",
+    "EncounterInfo",
     # Encounter
     "EncounterBase",
     "EncounterCreate",

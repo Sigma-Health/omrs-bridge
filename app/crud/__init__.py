@@ -5,6 +5,7 @@ Provides class-based CRUD operations with separation of concerns.
 
 from .base import BaseCRUD
 from .concepts import ConceptsCRUD
+from .diagnoses import DiagnosesCRUD
 from .encounters import EncountersCRUD
 from .observations import ObservationsCRUD
 from .orders import OrdersCRUD
@@ -13,6 +14,7 @@ from .visits import VisitsCRUD
 
 # Initialize CRUD instances for easy access
 concepts = ConceptsCRUD()
+diagnoses = DiagnosesCRUD()
 encounters = EncountersCRUD()
 observations = ObservationsCRUD()
 orders = OrdersCRUD()
@@ -22,12 +24,14 @@ visits = VisitsCRUD()
 __all__ = [
     "BaseCRUD",
     "ConceptsCRUD",
+    "DiagnosesCRUD",
     "EncountersCRUD",
     "ObservationsCRUD",
     "OrdersCRUD",
     "OrderTypesCRUD",
     "VisitsCRUD",
     "concepts",
+    "diagnoses",
     "encounters",
     "observations",
     "orders",

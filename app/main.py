@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from app.api.orders import router as orders_router
 from app.api.observations import router as observations_router
 from app.api.concepts import router as concepts_router
+from app.api.diagnoses import router as diagnoses_router
 from app.api.encounters import router as encounters_router
 from app.api.order_types import router as order_types_router
 from app.api.visits import router as visits_router
@@ -90,6 +91,11 @@ app.include_router(
     concepts_router,
     prefix="/api/v1/concepts",
     tags=["concepts"],
+)
+app.include_router(
+    diagnoses_router,
+    prefix="/api/v1/diagnoses",
+    tags=["diagnoses"],
 )
 app.include_router(
     encounters_router,

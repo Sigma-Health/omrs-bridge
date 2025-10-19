@@ -12,6 +12,11 @@ from .concept import (
     ConceptClass,
     ConceptSet,
 )
+from .concept_reference import (
+    ConceptReferenceSource,
+    ConceptReferenceTerm,
+    ConceptReferenceMap,
+)
 from .encounter import Encounter
 from .obs import Obs
 from .order import Order
@@ -29,6 +34,9 @@ __all__ = [
     "ConceptDatatype",
     "ConceptClass",
     "ConceptSet",
+    "ConceptReferenceSource",
+    "ConceptReferenceTerm",
+    "ConceptReferenceMap",
     "Encounter",
     "Obs",
     "Order",
