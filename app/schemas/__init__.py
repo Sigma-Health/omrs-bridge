@@ -14,8 +14,8 @@ from .concept import (
     ConceptUpdateResponse,
 )
 from .diagnosis import (
-    DiagnosisObservation, 
-    VisitDiagnoses, 
+    DiagnosisObservation,
+    VisitDiagnoses,
     DiagnosisResponse,
     ReferenceCode,
     DiagnosisConcept,
@@ -81,6 +81,15 @@ from .visit import (
     VisitResponse,
     VisitUpdateResponse,
     PersonInfo as VisitPersonInfo,
+)
+from .vitals import (
+    VitalSign,
+    VitalsResponse,
+    VisitVitals,
+    VitalsGroupedResponse,
+    VitalsByType,
+    PatientVitalsInfo,
+    EncounterVitalsInfo,
 )
 
 __all__ = [
@@ -158,4 +167,12 @@ __all__ = [
     "VisitResponse",
     "VisitUpdateResponse",
     "VisitPersonInfo",
+    # Vitals
+    "VitalSign",
+    "VitalsResponse",
+    "VisitVitals",
+    "VitalsGroupedResponse",
+    "VitalsByType",
+    "PatientVitalsInfo",
+    "EncounterVitalsInfo",
 ]
