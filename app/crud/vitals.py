@@ -11,6 +11,10 @@ from app.sql.vitals_sql import (
     get_vitals_count_by_visit_sql,
     get_vitals_grouped_by_type_sql,
 )
+from app.sql.vitals_simple_sql import (
+    get_vitals_simple_by_visit_sql,
+    get_vitals_simple_count_by_visit_sql,
+)
 from app.schemas.vitals import (
     VitalSign,
     VitalsResponse,
@@ -48,6 +52,12 @@ class VitalsCRUD:
         result = db.execute(text(sql), params)
         vitals = self._process_vitals_results(result)
 
+        # If no vitals found with the main query, try the simplified approach
+        if not vitals:
+            sql_simple = get_vitals_simple_by_visit_sql()
+            result_simple = db.execute(text(sql_simple), params)
+            vitals = self._process_vitals_results(result_simple)
+
         # Get visit and patient info from first vital if available
         visit_info = None
         patient_info = None
@@ -71,10 +81,16 @@ class VitalsCRUD:
                 encounter_datetime=getattr(first_vital, "encounter_datetime", None),
             )
 
-        # Get total count
+        # Get total count - try both approaches
         count_sql = get_vitals_count_by_visit_sql()
         count_result = db.execute(text(count_sql), {"visit_id": visit_id})
         total_count = count_result.scalar()
+        
+        # If count is 0, try the simplified count query
+        if total_count == 0:
+            count_sql_simple = get_vitals_simple_count_by_visit_sql()
+            count_result_simple = db.execute(text(count_sql_simple), {"visit_id": visit_id})
+            total_count = count_result_simple.scalar()
 
         return VisitVitals(
             visit_id=visit_id,

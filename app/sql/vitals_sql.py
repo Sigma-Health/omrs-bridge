@@ -98,7 +98,22 @@ def get_vitals_by_visit_sql() -> str:
 
     WHERE o.voided = 0
         AND v.visit_id = :visit_id
-        AND cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign')
+        AND (
+            -- Filter by concept class names (common vital sign classes)
+            cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign', 'Vital Signs Set', 'Vital Signs Set Member')
+            OR
+            -- Filter by specific vital sign concept names
+            LOWER(cn.name) LIKE '%blood pressure%'
+            OR LOWER(cn.name) LIKE '%temperature%'
+            OR LOWER(cn.name) LIKE '%pulse%'
+            OR LOWER(cn.name) LIKE '%heart rate%'
+            OR LOWER(cn.name) LIKE '%weight%'
+            OR LOWER(cn.name) LIKE '%height%'
+            OR LOWER(cn.name) LIKE '%respiratory rate%'
+            OR LOWER(cn.name) LIKE '%oxygen saturation%'
+            OR LOWER(cn.name) LIKE '%pain score%'
+            OR LOWER(cn.name) LIKE '%vital%'
+        )
         AND (o.value_numeric IS NOT NULL 
              OR o.value_text IS NOT NULL 
              OR o.value_coded IS NOT NULL 
@@ -203,7 +218,22 @@ def get_vitals_by_visit_uuid_sql() -> str:
 
     WHERE o.voided = 0
         AND v.uuid = :visit_uuid
-        AND cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign')
+        AND (
+            -- Filter by concept class names (common vital sign classes)
+            cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign', 'Vital Signs Set', 'Vital Signs Set Member')
+            OR
+            -- Filter by specific vital sign concept names
+            LOWER(cn.name) LIKE '%blood pressure%'
+            OR LOWER(cn.name) LIKE '%temperature%'
+            OR LOWER(cn.name) LIKE '%pulse%'
+            OR LOWER(cn.name) LIKE '%heart rate%'
+            OR LOWER(cn.name) LIKE '%weight%'
+            OR LOWER(cn.name) LIKE '%height%'
+            OR LOWER(cn.name) LIKE '%respiratory rate%'
+            OR LOWER(cn.name) LIKE '%oxygen saturation%'
+            OR LOWER(cn.name) LIKE '%pain score%'
+            OR LOWER(cn.name) LIKE '%vital%'
+        )
         AND (o.value_numeric IS NOT NULL 
              OR o.value_text IS NOT NULL 
              OR o.value_coded IS NOT NULL 
@@ -227,7 +257,22 @@ def get_vitals_count_by_visit_sql() -> str:
     INNER JOIN concept_class cc ON c.class_id = cc.concept_class_id
     WHERE o.voided = 0
         AND v.visit_id = :visit_id
-        AND cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign')
+        AND (
+            -- Filter by concept class names (common vital sign classes)
+            cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign', 'Vital Signs Set', 'Vital Signs Set Member')
+            OR
+            -- Filter by specific vital sign concept names
+            LOWER(cn.name) LIKE '%blood pressure%'
+            OR LOWER(cn.name) LIKE '%temperature%'
+            OR LOWER(cn.name) LIKE '%pulse%'
+            OR LOWER(cn.name) LIKE '%heart rate%'
+            OR LOWER(cn.name) LIKE '%weight%'
+            OR LOWER(cn.name) LIKE '%height%'
+            OR LOWER(cn.name) LIKE '%respiratory rate%'
+            OR LOWER(cn.name) LIKE '%oxygen saturation%'
+            OR LOWER(cn.name) LIKE '%pain score%'
+            OR LOWER(cn.name) LIKE '%vital%'
+        )
         AND (o.value_numeric IS NOT NULL 
              OR o.value_text IS NOT NULL 
              OR o.value_coded IS NOT NULL 
@@ -329,7 +374,22 @@ def get_vitals_grouped_by_type_sql() -> str:
 
     WHERE o.voided = 0
         AND v.visit_id = :visit_id
-        AND cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign')
+        AND (
+            -- Filter by concept class names (common vital sign classes)
+            cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign', 'Vital Signs Set', 'Vital Signs Set Member')
+            OR
+            -- Filter by specific vital sign concept names
+            LOWER(cn.name) LIKE '%blood pressure%'
+            OR LOWER(cn.name) LIKE '%temperature%'
+            OR LOWER(cn.name) LIKE '%pulse%'
+            OR LOWER(cn.name) LIKE '%heart rate%'
+            OR LOWER(cn.name) LIKE '%weight%'
+            OR LOWER(cn.name) LIKE '%height%'
+            OR LOWER(cn.name) LIKE '%respiratory rate%'
+            OR LOWER(cn.name) LIKE '%oxygen saturation%'
+            OR LOWER(cn.name) LIKE '%pain score%'
+            OR LOWER(cn.name) LIKE '%vital%'
+        )
         AND (o.value_numeric IS NOT NULL 
              OR o.value_text IS NOT NULL 
              OR o.value_coded IS NOT NULL 
