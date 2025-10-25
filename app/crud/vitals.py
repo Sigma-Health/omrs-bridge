@@ -58,17 +58,17 @@ class VitalsCRUD:
             # Extract visit info from the first vital's encounter
             visit_info = {
                 "visit_id": visit_id,
-                "visit_uuid": first_vital.obs_datetime,  # This would need to be visit_uuid from query
+                "visit_uuid": getattr(first_vital, "visit_uuid", ""),
             }
             patient_info = PatientVitalsInfo(
-                patient_id=first_vital.obs_id,  # This would need to be patient_id from query
-                uuid="",  # Would need to be populated from query
-                name="Unknown",  # Would need to be populated from query
+                patient_id=getattr(first_vital, "patient_id", 0),
+                uuid=getattr(first_vital, "patient_uuid", ""),
+                name=getattr(first_vital, "patient_name", "Unknown"),
             )
             encounter_info = EncounterVitalsInfo(
-                encounter_id=0,  # Would need to be populated from query
-                uuid="",
-                encounter_datetime=first_vital.obs_datetime,
+                encounter_id=getattr(first_vital, "encounter_id", 0),
+                uuid=getattr(first_vital, "encounter_uuid", ""),
+                encounter_datetime=getattr(first_vital, "encounter_datetime", None),
             )
 
         # Get total count
@@ -78,14 +78,14 @@ class VitalsCRUD:
 
         return VisitVitals(
             visit_id=visit_id,
-            visit_uuid="",  # Would need to be populated
+            visit_uuid=getattr(vitals[0], "visit_uuid", "") if vitals else "",
             patient=patient_info
             or PatientVitalsInfo(patient_id=0, uuid="", name="Unknown"),
             encounter=encounter_info
             or EncounterVitalsInfo(
                 encounter_id=0,
                 uuid="",
-                encounter_datetime=first_vital.obs_datetime if vitals else None,
+                encounter_datetime=None,
             ),
             vitals=vitals,
             total_count=total_count,
@@ -187,14 +187,14 @@ class VitalsCRUD:
 
         return VitalsGroupedResponse(
             visit_id=visit_id,
-            visit_uuid="",  # Would need to be populated
+            visit_uuid=getattr(vitals[0], "visit_uuid", "") if vitals else "",
             patient=patient_info
             or PatientVitalsInfo(patient_id=0, uuid="", name="Unknown"),
             encounter=encounter_info
             or EncounterVitalsInfo(
                 encounter_id=0,
                 uuid="",
-                encounter_datetime=vitals[0].obs_datetime if vitals else None,
+                encounter_datetime=None,
             ),
             vitals_by_type=vitals_by_type_list,
             total_count=total_count,
@@ -207,7 +207,29 @@ class VitalsCRUD:
         vitals = []
 
         for row in result:
-            # Build vital sign
+            # Build patient name from components
+            patient_name_parts = []
+            if hasattr(row, "patient_prefix") and row.patient_prefix:
+                patient_name_parts.append(row.patient_prefix)
+            if hasattr(row, "patient_given_name") and row.patient_given_name:
+                patient_name_parts.append(row.patient_given_name)
+            if hasattr(row, "patient_middle_name") and row.patient_middle_name:
+                patient_name_parts.append(row.patient_middle_name)
+            if hasattr(row, "patient_family_name") and row.patient_family_name:
+                patient_name_parts.append(row.patient_family_name)
+            if hasattr(row, "patient_family_name2") and row.patient_family_name2:
+                patient_name_parts.append(row.patient_family_name2)
+            if (
+                hasattr(row, "patient_family_name_suffix")
+                and row.patient_family_name_suffix
+            ):
+                patient_name_parts.append(row.patient_family_name_suffix)
+
+            patient_name = (
+                " ".join(patient_name_parts) if patient_name_parts else "Unknown"
+            )
+
+            # Build vital sign with additional context
             vital = VitalSign(
                 obs_id=row.obs_id,
                 uuid=row.obs_uuid,
@@ -223,6 +245,15 @@ class VitalsCRUD:
                 status=row.status,
                 interpretation=row.interpretation,
             )
+
+            # Add additional context attributes for later use
+            vital.patient_id = getattr(row, "patient_id", 0)
+            vital.patient_uuid = getattr(row, "patient_uuid", "")
+            vital.patient_name = patient_name
+            vital.encounter_id = getattr(row, "encounter_id", 0)
+            vital.encounter_uuid = getattr(row, "encounter_uuid", "")
+            vital.encounter_datetime = getattr(row, "encounter_datetime", None)
+            vital.visit_uuid = getattr(row, "visit_uuid", "")
 
             vitals.append(vital)
 

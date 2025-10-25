@@ -41,7 +41,7 @@ class EncounterVitalsInfo(BaseModel):
 
     encounter_id: int
     uuid: str
-    encounter_datetime: datetime
+    encounter_datetime: Optional[datetime] = None
     encounter_type: Optional[int] = None
     location_id: Optional[int] = None
 
