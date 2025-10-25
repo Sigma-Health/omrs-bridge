@@ -1,12 +1,12 @@
 """
-Targeted SQL queries for vitals/observations based on specific concept IDs.
+Comprehensive SQL queries for vitals/observations that look for any numeric observations.
 """
 
 
-def get_vitals_targeted_by_visit_sql() -> str:
+def get_vitals_comprehensive_by_visit_sql() -> str:
     """
-    Get SQL query for vitals/observations by visit using specific concept IDs.
-    This query targets known vital sign concepts.
+    Get SQL query for vitals/observations by visit - comprehensive approach.
+    This query looks for any observations with numeric values that could be vital signs.
     """
     return """
     SELECT 
@@ -99,11 +99,24 @@ def get_vitals_targeted_by_visit_sql() -> str:
     WHERE o.voided = 0
         AND v.visit_id = :visit_id
         AND (
+            -- Look for any observations with numeric values (likely vital signs)
+            (o.value_numeric IS NOT NULL AND o.value_numeric > 0)
+            OR
+            -- Look for coded observations (like Yes/No answers)
+            o.value_coded IS NOT NULL
+            OR
+            -- Look for text observations that might contain vital signs
+            (o.value_text IS NOT NULL AND LENGTH(o.value_text) < 100)
+            OR
+            -- Look for datetime observations
+            o.value_datetime IS NOT NULL
+        )
+        AND (
             -- Target specific known vital sign concept IDs from your database
             o.concept_id IN (8830, 32996, 8881, 57421, 57399, 9219, 8531, 8783, 58, 5085, 5086, 5087, 5088, 5089, 5090, 5091, 5092, 5093, 5094, 5095, 5096, 5097, 5098, 5099, 5100)
             OR
             -- Filter by concept class names (common vital sign classes)
-            cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign', 'Vital Signs Set', 'Vital Signs Set Member', 'Question', 'Misc', 'Finding')
+            cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign', 'Vital Signs Set', 'Vital Signs Set Member', 'Question', 'Misc', 'Finding', 'Test')
             OR
             -- Filter by specific vital sign concept names
             LOWER(cn.name) LIKE '%blood pressure%'
@@ -122,20 +135,18 @@ def get_vitals_targeted_by_visit_sql() -> str:
             OR LOWER(cn.name) LIKE '%rr%'
             OR LOWER(cn.name) LIKE '%spo2%'
             OR LOWER(cn.name) LIKE '%o2%'
+            OR LOWER(cn.name) LIKE '%measurement%'
+            OR LOWER(cn.name) LIKE '%reading%'
         )
-        AND (o.value_numeric IS NOT NULL 
-             OR o.value_text IS NOT NULL 
-             OR o.value_coded IS NOT NULL 
-             OR o.value_datetime IS NOT NULL)
 
     ORDER BY o.obs_datetime DESC, o.obs_id
     LIMIT :limit OFFSET :skip
     """
 
 
-def get_vitals_targeted_count_by_visit_sql() -> str:
+def get_vitals_comprehensive_count_by_visit_sql() -> str:
     """
-    Get count query for vitals by visit using specific concept IDs.
+    Get count query for vitals by visit - comprehensive approach.
     """
     return """
     SELECT COUNT(*) as total_count
@@ -151,11 +162,24 @@ def get_vitals_targeted_count_by_visit_sql() -> str:
     WHERE o.voided = 0
         AND v.visit_id = :visit_id
         AND (
+            -- Look for any observations with numeric values (likely vital signs)
+            (o.value_numeric IS NOT NULL AND o.value_numeric > 0)
+            OR
+            -- Look for coded observations (like Yes/No answers)
+            o.value_coded IS NOT NULL
+            OR
+            -- Look for text observations that might contain vital signs
+            (o.value_text IS NOT NULL AND LENGTH(o.value_text) < 100)
+            OR
+            -- Look for datetime observations
+            o.value_datetime IS NOT NULL
+        )
+        AND (
             -- Target specific known vital sign concept IDs from your database
             o.concept_id IN (8830, 32996, 8881, 57421, 57399, 9219, 8531, 8783, 58, 5085, 5086, 5087, 5088, 5089, 5090, 5091, 5092, 5093, 5094, 5095, 5096, 5097, 5098, 5099, 5100)
             OR
             -- Filter by concept class names (common vital sign classes)
-            cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign', 'Vital Signs Set', 'Vital Signs Set Member', 'Question', 'Misc', 'Finding')
+            cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign', 'Vital Signs Set', 'Vital Signs Set Member', 'Question', 'Misc', 'Finding', 'Test')
             OR
             -- Filter by specific vital sign concept names
             LOWER(cn.name) LIKE '%blood pressure%'
@@ -174,9 +198,7 @@ def get_vitals_targeted_count_by_visit_sql() -> str:
             OR LOWER(cn.name) LIKE '%rr%'
             OR LOWER(cn.name) LIKE '%spo2%'
             OR LOWER(cn.name) LIKE '%o2%'
+            OR LOWER(cn.name) LIKE '%measurement%'
+            OR LOWER(cn.name) LIKE '%reading%'
         )
-        AND (o.value_numeric IS NOT NULL 
-             OR o.value_text IS NOT NULL 
-             OR o.value_coded IS NOT NULL 
-             OR o.value_datetime IS NOT NULL)
     """

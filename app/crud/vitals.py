@@ -19,6 +19,10 @@ from app.sql.vitals_targeted_sql import (
     get_vitals_targeted_by_visit_sql,
     get_vitals_targeted_count_by_visit_sql,
 )
+from app.sql.vitals_comprehensive_sql import (
+    get_vitals_comprehensive_by_visit_sql,
+    get_vitals_comprehensive_count_by_visit_sql,
+)
 from app.schemas.vitals import (
     VitalSign,
     VitalsResponse,
@@ -50,12 +54,18 @@ class VitalsCRUD:
         Returns:
             VisitVitals with visit info and vitals
         """
-        # Try targeted query first (with specific concept IDs)
-        sql_targeted = get_vitals_targeted_by_visit_sql()
+        # Try comprehensive query first (looks for any numeric observations)
+        sql_comprehensive = get_vitals_comprehensive_by_visit_sql()
         params = {"visit_id": visit_id, "skip": skip, "limit": limit}
 
-        result = db.execute(text(sql_targeted), params)
+        result = db.execute(text(sql_comprehensive), params)
         vitals = self._process_vitals_results(result)
+
+        # If no vitals found with the comprehensive query, try the targeted query
+        if not vitals:
+            sql_targeted = get_vitals_targeted_by_visit_sql()
+            result = db.execute(text(sql_targeted), params)
+            vitals = self._process_vitals_results(result)
 
         # If no vitals found with the targeted query, try the main query
         if not vitals:
@@ -92,10 +102,16 @@ class VitalsCRUD:
                 encounter_datetime=getattr(first_vital, "encounter_datetime", None),
             )
 
-        # Get total count - try targeted approach first
-        count_sql_targeted = get_vitals_targeted_count_by_visit_sql()
-        count_result = db.execute(text(count_sql_targeted), {"visit_id": visit_id})
+        # Get total count - try comprehensive approach first
+        count_sql_comprehensive = get_vitals_comprehensive_count_by_visit_sql()
+        count_result = db.execute(text(count_sql_comprehensive), {"visit_id": visit_id})
         total_count = count_result.scalar()
+        
+        # If count is 0, try the targeted count query
+        if total_count == 0:
+            count_sql_targeted = get_vitals_targeted_count_by_visit_sql()
+            count_result = db.execute(text(count_sql_targeted), {"visit_id": visit_id})
+            total_count = count_result.scalar()
         
         # If count is 0, try the main count query
         if total_count == 0:
