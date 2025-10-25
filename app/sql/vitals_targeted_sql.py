@@ -1,0 +1,182 @@
+"""
+Targeted SQL queries for vitals/observations based on specific concept IDs.
+"""
+
+
+def get_vitals_targeted_by_visit_sql() -> str:
+    """
+    Get SQL query for vitals/observations by visit using specific concept IDs.
+    This query targets known vital sign concepts.
+    """
+    return """
+    SELECT 
+        o.obs_id,
+        o.uuid AS obs_uuid,
+        o.obs_datetime,
+        o.comments,
+        o.status,
+        o.interpretation,
+        o.value_numeric,
+        o.value_text,
+        o.value_coded,
+        o.value_datetime,
+        
+        -- Patient information
+        p.patient_id,
+        pt.uuid AS patient_uuid,
+        pt.gender AS patient_gender,
+        pt.birthdate AS patient_birthdate,
+        
+        -- Patient name
+        pn.given_name AS patient_given_name,
+        pn.family_name AS patient_family_name,
+        pn.prefix AS patient_prefix,
+        pn.middle_name AS patient_middle_name,
+        pn.family_name2 AS patient_family_name2,
+        pn.family_name_suffix AS patient_family_name_suffix,
+        
+        -- Encounter information
+        e.encounter_id,
+        e.uuid AS encounter_uuid,
+        e.encounter_datetime,
+        e.encounter_type,
+        e.location_id,
+        
+        -- Visit information
+        v.visit_id,
+        v.uuid AS visit_uuid,
+        
+        -- Concept information (vital sign)
+        c.concept_id,
+        c.uuid AS concept_uuid,
+        c.short_name AS concept_short_name,
+        c.description AS concept_description,
+        
+        -- Concept name
+        cn.name AS concept_name,
+        cn.locale AS concept_name_locale,
+        cn.concept_name_type,
+        
+        -- Coded value name (if value is coded)
+        cvn.name AS value_coded_name,
+        
+        -- Concept class for filtering vital signs
+        cc.name AS concept_class_name
+
+    FROM obs o
+    
+    -- Join with encounter and visit
+    INNER JOIN encounter e ON o.encounter_id = e.encounter_id
+    INNER JOIN visit v ON e.visit_id = v.visit_id
+    
+    -- Join with patient
+    INNER JOIN patient p ON e.patient_id = p.patient_id
+    INNER JOIN person pt ON p.patient_id = pt.person_id
+    
+    -- Join with patient name
+    INNER JOIN person_name pn ON pt.person_id = pn.person_id 
+        AND pn.preferred = 1 
+        AND pn.voided = 0
+    
+    -- Join with concept (vital sign)
+    INNER JOIN concept c ON o.concept_id = c.concept_id
+    
+    -- Join with concept name
+    INNER JOIN concept_name cn ON c.concept_id = cn.concept_id
+        AND cn.locale = 'en'
+        AND cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND cn.voided = 0
+    
+    -- Join with concept class to filter vital signs
+    INNER JOIN concept_class cc ON c.class_id = cc.concept_class_id
+    
+    -- Left join with coded value name
+    LEFT JOIN concept_name cvn ON o.value_coded = cvn.concept_id
+        AND cvn.locale = 'en'
+        AND cvn.concept_name_type = 'FULLY_SPECIFIED'
+        AND cvn.voided = 0
+
+    WHERE o.voided = 0
+        AND v.visit_id = :visit_id
+        AND (
+            -- Target specific known vital sign concept IDs
+            o.concept_id IN (8830, 32996, 5085, 5086, 5087, 5088, 5089, 5090, 5091, 5092, 5093, 5094, 5095, 5096, 5097, 5098, 5099, 5100)
+            OR
+            -- Filter by concept class names (common vital sign classes)
+            cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign', 'Vital Signs Set', 'Vital Signs Set Member', 'Question', 'Misc', 'Finding')
+            OR
+            -- Filter by specific vital sign concept names
+            LOWER(cn.name) LIKE '%blood pressure%'
+            OR LOWER(cn.name) LIKE '%temperature%'
+            OR LOWER(cn.name) LIKE '%pulse%'
+            OR LOWER(cn.name) LIKE '%heart rate%'
+            OR LOWER(cn.name) LIKE '%weight%'
+            OR LOWER(cn.name) LIKE '%height%'
+            OR LOWER(cn.name) LIKE '%respiratory rate%'
+            OR LOWER(cn.name) LIKE '%oxygen saturation%'
+            OR LOWER(cn.name) LIKE '%pain score%'
+            OR LOWER(cn.name) LIKE '%vital%'
+            OR LOWER(cn.name) LIKE '%bp%'
+            OR LOWER(cn.name) LIKE '%temp%'
+            OR LOWER(cn.name) LIKE '%hr%'
+            OR LOWER(cn.name) LIKE '%rr%'
+            OR LOWER(cn.name) LIKE '%spo2%'
+            OR LOWER(cn.name) LIKE '%o2%'
+        )
+        AND (o.value_numeric IS NOT NULL 
+             OR o.value_text IS NOT NULL 
+             OR o.value_coded IS NOT NULL 
+             OR o.value_datetime IS NOT NULL)
+
+    ORDER BY o.obs_datetime DESC, o.obs_id
+    LIMIT :limit OFFSET :skip
+    """
+
+
+def get_vitals_targeted_count_by_visit_sql() -> str:
+    """
+    Get count query for vitals by visit using specific concept IDs.
+    """
+    return """
+    SELECT COUNT(*) as total_count
+    FROM obs o
+    INNER JOIN encounter e ON o.encounter_id = e.encounter_id
+    INNER JOIN visit v ON e.visit_id = v.visit_id
+    INNER JOIN concept c ON o.concept_id = c.concept_id
+    INNER JOIN concept_class cc ON c.class_id = cc.concept_class_id
+    INNER JOIN concept_name cn ON c.concept_id = cn.concept_id
+        AND cn.locale = 'en'
+        AND cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND cn.voided = 0
+    WHERE o.voided = 0
+        AND v.visit_id = :visit_id
+        AND (
+            -- Target specific known vital sign concept IDs
+            o.concept_id IN (8830, 32996, 5085, 5086, 5087, 5088, 5089, 5090, 5091, 5092, 5093, 5094, 5095, 5096, 5097, 5098, 5099, 5100)
+            OR
+            -- Filter by concept class names (common vital sign classes)
+            cc.name IN ('Vitals', 'Vital Signs', 'Vital', 'Vital Sign', 'Vital Signs Set', 'Vital Signs Set Member', 'Question', 'Misc', 'Finding')
+            OR
+            -- Filter by specific vital sign concept names
+            LOWER(cn.name) LIKE '%blood pressure%'
+            OR LOWER(cn.name) LIKE '%temperature%'
+            OR LOWER(cn.name) LIKE '%pulse%'
+            OR LOWER(cn.name) LIKE '%heart rate%'
+            OR LOWER(cn.name) LIKE '%weight%'
+            OR LOWER(cn.name) LIKE '%height%'
+            OR LOWER(cn.name) LIKE '%respiratory rate%'
+            OR LOWER(cn.name) LIKE '%oxygen saturation%'
+            OR LOWER(cn.name) LIKE '%pain score%'
+            OR LOWER(cn.name) LIKE '%vital%'
+            OR LOWER(cn.name) LIKE '%bp%'
+            OR LOWER(cn.name) LIKE '%temp%'
+            OR LOWER(cn.name) LIKE '%hr%'
+            OR LOWER(cn.name) LIKE '%rr%'
+            OR LOWER(cn.name) LIKE '%spo2%'
+            OR LOWER(cn.name) LIKE '%o2%'
+        )
+        AND (o.value_numeric IS NOT NULL 
+             OR o.value_text IS NOT NULL 
+             OR o.value_coded IS NOT NULL 
+             OR o.value_datetime IS NOT NULL)
+    """

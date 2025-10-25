@@ -24,6 +24,14 @@ class VitalSign(BaseModel):
     comments: Optional[str] = None
     status: Optional[str] = None
     interpretation: Optional[str] = None
+    # Additional context fields
+    patient_id: Optional[int] = None
+    patient_uuid: Optional[str] = None
+    patient_name: Optional[str] = None
+    encounter_id: Optional[int] = None
+    encounter_uuid: Optional[str] = None
+    encounter_datetime: Optional[datetime] = None
+    visit_uuid: Optional[str] = None
 
 
 class PatientVitalsInfo(BaseModel):
