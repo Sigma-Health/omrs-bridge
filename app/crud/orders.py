@@ -1,8 +1,9 @@
 import logging
 
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from sqlalchemy import and_
+from sqlalchemy.sql import func
 from datetime import datetime
 
 from .base import BaseCRUD
@@ -416,13 +417,14 @@ class OrdersCRUD(BaseCRUD[Order]):
             Concept,
             ConceptName,
         )
-        from sqlalchemy.orm import aliased
 
         # Create aliases for Person and PersonName tables to join them multiple times
         OrdererPerson = aliased(Person)
         OrdererPersonName = aliased(PersonName)
         PatientPerson = aliased(Person)
         PatientPersonName = aliased(PersonName)
+        # Create alias for SHORT concept name
+        ShortConceptName = aliased(ConceptName)
 
         query = (
             db.query(
@@ -463,7 +465,9 @@ class OrdersCRUD(BaseCRUD[Order]):
                 # Concept information
                 Concept.concept_id.label("concept_id"),
                 Concept.uuid.label("concept_uuid"),
-                Concept.short_name.label("concept_short_name"),
+                func.coalesce(ShortConceptName.name, Concept.short_name).label(
+                    "concept_short_name"
+                ),
                 Concept.description.label("concept_description"),
                 Concept.is_set.label("concept_is_set"),
                 # Concept name information
@@ -531,6 +535,16 @@ class OrdersCRUD(BaseCRUD[Order]):
                     ConceptName.concept_name_type
                     == "FULLY_SPECIFIED",  # Only FULLY_SPECIFIED names
                     ConceptName.voided == False,  # noqa: E712
+                ),
+            )
+            # Join for SHORT concept name (to populate short_name field)
+            .outerjoin(
+                ShortConceptName,
+                and_(
+                    ShortConceptName.concept_id == Concept.concept_id,
+                    ShortConceptName.locale == "en",
+                    ShortConceptName.concept_name_type == "SHORT",
+                    ShortConceptName.voided == False,  # noqa: E712
                 ),
             )
             .filter(

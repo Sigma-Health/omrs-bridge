@@ -80,7 +80,7 @@ def get_orders_with_enrichment_sql() -> str:
         -- Concept information
         c.concept_id AS concept_id,
         c.uuid AS concept_uuid,
-        c.short_name AS concept_short_name,
+        COALESCE(short_cn.name, c.short_name) AS concept_short_name,
         c.description AS concept_description,
         c.is_set AS concept_is_set,
         
@@ -138,6 +138,14 @@ def get_orders_with_enrichment_sql() -> str:
         AND cn.locale = 'en'
         AND cn.concept_name_type = 'FULLY_SPECIFIED'
         AND cn.voided = false
+    )
+
+    -- Join for SHORT concept name (to populate short_name field)
+    LEFT OUTER JOIN concept_name short_cn ON (
+        short_cn.concept_id = c.concept_id 
+        AND short_cn.locale = 'en'
+        AND short_cn.concept_name_type = 'SHORT'
+        AND short_cn.voided = false
     )
 
     WHERE {where_clause}
@@ -232,7 +240,7 @@ def get_single_order_with_expansion_sql() -> str:
         -- Main concept information
         c.concept_id AS concept_id,
         c.uuid AS concept_uuid,
-        c.short_name AS concept_short_name,
+        COALESCE(short_cn.name, c.short_name) AS concept_short_name,
         c.description AS concept_description,
         c.is_set AS concept_is_set,
         
@@ -382,6 +390,14 @@ def get_single_order_with_expansion_sql() -> str:
         AND cn.locale = 'en'
         AND cn.concept_name_type = 'FULLY_SPECIFIED'
         AND cn.voided = false
+    )
+
+    -- Join for SHORT concept name (to populate short_name field)
+    LEFT OUTER JOIN concept_name short_cn ON (
+        short_cn.concept_id = c.concept_id 
+        AND short_cn.locale = 'en'
+        AND short_cn.concept_name_type = 'SHORT'
+        AND short_cn.voided = false
     )
 
     -- Join for concept datatype information
