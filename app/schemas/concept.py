@@ -2,9 +2,29 @@
 Concept schemas.
 """
 
-from pydantic import BaseModel
-from typing import Optional
 from datetime import datetime
+from typing import Optional, List
+
+from pydantic import BaseModel, Field
+
+
+class ConceptNameResponse(BaseModel):
+    """Schema for concept name entries."""
+
+    concept_name_id: int
+    concept_id: int
+    name: str
+    locale: Optional[str] = None
+    locale_preferred: bool
+    uuid: str
+    voided: bool
+    concept_name_type: Optional[str] = None
+    date_created: datetime
+    date_changed: Optional[datetime] = None
+    changed_by: Optional[int] = None
+
+    class Config:
+        from_attributes = True
 
 
 class ConceptBase(BaseModel):
@@ -62,9 +82,12 @@ class ConceptResponse(ConceptBase):
     date_changed: Optional[datetime] = None
     retired_by: Optional[int] = None
     date_retired: Optional[datetime] = None
+    preferred_name: Optional[str] = None
+    names: List[ConceptNameResponse] = Field(default_factory=list, alias="active_names")
 
     class Config:
         from_attributes = True
+        allow_population_by_field_name = True
 
 
 class ConceptUpdateResponse(BaseModel):

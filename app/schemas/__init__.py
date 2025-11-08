@@ -12,6 +12,7 @@ from .concept import (
     ConceptReplace,
     ConceptResponse,
     ConceptUpdateResponse,
+    ConceptNameResponse,
 )
 from .diagnosis import (
     DiagnosisObservation,
@@ -114,6 +115,7 @@ __all__ = [
     "ConceptReplace",
     "ConceptResponse",
     "ConceptUpdateResponse",
+    "ConceptNameResponse",
     # Diagnosis
     "DiagnosisObservation",
     "VisitDiagnoses",

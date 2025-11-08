@@ -1,10 +1,10 @@
 from typing import List, Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import and_, or_
 from datetime import datetime
 
 from .base import BaseCRUD
-from app.models import Concept
+from app.models import Concept, ConceptName
 
 
 class ConceptsCRUD(BaseCRUD[Concept]):
@@ -18,6 +18,28 @@ class ConceptsCRUD(BaseCRUD[Concept]):
     def __init__(self):
         """Initialize with the Concept model."""
         super().__init__(Concept)
+
+    def _query_with_names(self, db: Session):
+        """Return base concept query with concept names eagerly loaded."""
+        return db.query(Concept).options(selectinload(Concept.names))
+
+    def list(self, db: Session, skip: int = 0, limit: int = 100) -> List[Concept]:
+        """
+        List concepts with eager-loaded names.
+        """
+        return self._query_with_names(db).offset(skip).limit(limit).all()
+
+    def get(self, db: Session, id: int) -> Optional[Concept]:
+        """
+        Get a concept by ID with names eagerly loaded.
+        """
+        return self._query_with_names(db).filter(Concept.concept_id == id).first()
+
+    def get_by_uuid(self, db: Session, uuid: str) -> Optional[Concept]:
+        """
+        Get a concept by UUID with names eagerly loaded.
+        """
+        return self._query_with_names(db).filter(Concept.uuid == uuid).first()
 
     def _set_default_values(self, obj_data: dict) -> None:
         """Set concept-specific default values."""
@@ -39,7 +61,7 @@ class ConceptsCRUD(BaseCRUD[Concept]):
         Returns:
             The concept if found, None otherwise
         """
-        return db.query(Concept).filter(Concept.short_name == name).first()
+        return self._query_with_names(db).filter(Concept.short_name == name).first()
 
     def get_by_description(self, db: Session, description: str) -> Optional[Concept]:
         """
@@ -52,7 +74,11 @@ class ConceptsCRUD(BaseCRUD[Concept]):
         Returns:
             The concept if found, None otherwise
         """
-        return db.query(Concept).filter(Concept.description == description).first()
+        return (
+            self._query_with_names(db)
+            .filter(Concept.description == description)
+            .first()
+        )
 
     def get_concepts_by_datatype(
         self, db: Session, datatype_id: int, skip: int = 0, limit: int = 100
@@ -70,7 +96,7 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             List of concepts with the specified datatype
         """
         return (
-            db.query(Concept)
+            self._query_with_names(db)
             .filter(and_(Concept.datatype_id == datatype_id, Concept.retired == False))
             .offset(skip)
             .limit(limit)
@@ -93,7 +119,7 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             List of concepts with the specified class
         """
         return (
-            db.query(Concept)
+            self._query_with_names(db)
             .filter(and_(Concept.class_id == class_id, Concept.retired == False))
             .offset(skip)
             .limit(limit)
@@ -116,18 +142,18 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             List of concepts created by the specified user
         """
         return (
-            db.query(Concept)
+            self._query_with_names(db)
             .filter(and_(Concept.creator == creator, Concept.retired == False))
             .offset(skip)
             .limit(limit)
             .all()
         )
 
-    def search_concepts_by_name(
+    def search_concepts(
         self, db: Session, name: str, skip: int = 0, limit: int = 100
     ) -> List[Concept]:
         """
-        Search concepts by short_name or description.
+        Search concepts by short_name, description, or concept names.
 
         Args:
             db: Database session
@@ -138,38 +164,40 @@ class ConceptsCRUD(BaseCRUD[Concept]):
         Returns:
             List of concepts matching the search criteria
         """
-        return (
-            db.query(Concept)
+        search_term = f"%{name}%"
+        query = (
+            self._query_with_names(db)
+            .outerjoin(ConceptName, ConceptName.concept_id == Concept.concept_id)
             .filter(
                 and_(
                     Concept.retired == False,
-                    (
-                        Concept.short_name.contains(name)
-                        | Concept.description.contains(name)
+                    or_(
+                        Concept.short_name.ilike(search_term),
+                        Concept.description.ilike(search_term),
+                        ConceptName.name.ilike(search_term),
                     ),
                 )
             )
-            .offset(skip)
-            .limit(limit)
-            .all()
+            .distinct()
         )
+        return query.offset(skip).limit(limit).all()
+
+    def search_concepts_by_name(
+        self, db: Session, name: str, skip: int = 0, limit: int = 100
+    ) -> List[Concept]:
+        """
+        Compatibility method for the previous API; forwards to search_concepts.
+        """
+        return self.search_concepts(db, name, skip, limit)
 
     def get_active_concepts(
         self, db: Session, skip: int = 0, limit: int = 100
     ) -> List[Concept]:
         """
         Get only active (non-retired) concepts.
-
-        Args:
-            db: Database session
-            skip: Number of records to skip
-            limit: Maximum number of records to return
-
-        Returns:
-            List of active concepts
         """
         return (
-            db.query(Concept)
+            self._query_with_names(db)
             .filter(Concept.retired == False)
             .offset(skip)
             .limit(limit)
@@ -181,17 +209,9 @@ class ConceptsCRUD(BaseCRUD[Concept]):
     ) -> List[Concept]:
         """
         Get only retired concepts.
-
-        Args:
-            db: Database session
-            skip: Number of records to skip
-            limit: Maximum number of records to return
-
-        Returns:
-            List of retired concepts
         """
         return (
-            db.query(Concept)
+            self._query_with_names(db)
             .filter(
                 Concept.retired == True  # noqa: E712
             )

@@ -9,8 +9,11 @@ from sqlalchemy import (
     DateTime,
     Boolean,
     Text,
+    ForeignKey,
 )
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
+
 from app.database import Base
 
 
@@ -18,7 +21,12 @@ class ConceptName(Base):
     __tablename__ = "concept_name"
 
     concept_name_id = Column(Integer, primary_key=True, index=True)
-    concept_id = Column(Integer, nullable=False, index=True)
+    concept_id = Column(
+        Integer,
+        ForeignKey("concept.concept_id"),
+        nullable=False,
+        index=True,
+    )
     name = Column(String(255), nullable=False)
     locale = Column(String(50), nullable=True)
     locale_preferred = Column(Boolean, default=False)
@@ -32,6 +40,11 @@ class ConceptName(Base):
     uuid = Column(String(38), unique=True, index=True)
     date_changed = Column(DateTime, nullable=True)
     changed_by = Column(Integer, nullable=True)
+
+    concept = relationship(
+        "Concept",
+        back_populates="names",
+    )
 
 
 class ConceptAnswer(Base):
@@ -111,3 +124,26 @@ class Concept(Base):
     date_retired = Column(DateTime, nullable=True)
     retire_reason = Column(Text, nullable=True)
     uuid = Column(String(38), unique=True, index=True)
+
+    names = relationship(
+        "ConceptName",
+        back_populates="concept",
+        lazy="selectin",
+        order_by="ConceptName.locale_preferred.desc(), ConceptName.concept_name_id",
+    )
+
+    @property
+    def preferred_name(self):
+        """Return the preferred (locale_preferred) concept name if available."""
+        for concept_name in self.names:
+            if not concept_name.voided and concept_name.locale_preferred:
+                return concept_name.name
+        for concept_name in self.names:
+            if not concept_name.voided:
+                return concept_name.name
+        return self.short_name
+
+    @property
+    def active_names(self):
+        """Return non-voided concept names."""
+        return [concept_name for concept_name in self.names if not concept_name.voided]
