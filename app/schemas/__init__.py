@@ -48,6 +48,14 @@ from .order import (
     OrdererInfo,
     ConceptInfo,
 )
+from .drug import (
+    DrugBase,
+    DrugCreate,
+    DrugUpdate,
+    DrugReplace,
+    DrugResponse,
+    DrugUpdateResponse,
+)
 from .order_concept_details import (
     OrderConceptDetailsResponse,
     ConceptDetailsInfo,
@@ -137,6 +145,13 @@ __all__ = [
     "PersonInfo",
     "OrdererInfo",
     "ConceptInfo",
+    # Drug
+    "DrugBase",
+    "DrugCreate",
+    "DrugUpdate",
+    "DrugReplace",
+    "DrugResponse",
+    "DrugUpdateResponse",
     # Order Concept Details
     "OrderConceptDetailsResponse",
     "ConceptDetailsInfo",

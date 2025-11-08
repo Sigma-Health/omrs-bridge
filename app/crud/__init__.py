@@ -9,6 +9,7 @@ from .diagnoses import DiagnosesCRUD
 from .encounters import EncountersCRUD
 from .observations import ObservationsCRUD
 from .orders import OrdersCRUD
+from .drugs import DrugsCRUD
 from .order_types import OrderTypesCRUD
 from .visits import VisitsCRUD
 from .vitals import VitalsCRUD
@@ -19,6 +20,7 @@ diagnoses = DiagnosesCRUD()
 encounters = EncountersCRUD()
 observations = ObservationsCRUD()
 orders = OrdersCRUD()
+drugs = DrugsCRUD()
 order_types = OrderTypesCRUD()
 visits = VisitsCRUD()
 vitals = VitalsCRUD()
@@ -30,6 +32,7 @@ __all__ = [
     "EncountersCRUD",
     "ObservationsCRUD",
     "OrdersCRUD",
+    "DrugsCRUD",
     "OrderTypesCRUD",
     "VisitsCRUD",
     "VitalsCRUD",
@@ -38,6 +41,7 @@ __all__ = [
     "encounters",
     "observations",
     "orders",
+    "drugs",
     "order_types",
     "visits",
     "vitals",

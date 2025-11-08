@@ -20,6 +20,7 @@ from .concept_reference import (
 from .encounter import Encounter
 from .obs import Obs
 from .order import Order
+from .drug import Drug
 from .order_type import OrderType
 from .patient import Patient
 from .person import Person, PersonName
@@ -40,6 +41,7 @@ __all__ = [
     "Encounter",
     "Obs",
     "Order",
+    "Drug",
     "OrderType",
     "Patient",
     "Person",
