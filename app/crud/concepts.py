@@ -1,10 +1,11 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session, selectinload, with_loader_criteria
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from datetime import datetime
 
 from .base import BaseCRUD
-from app.models import Concept, ConceptName
+
+from app.models import Concept, ConceptName, ConceptClass
 
 
 class ConceptsCRUD(BaseCRUD[Concept]):
@@ -166,7 +167,7 @@ class ConceptsCRUD(BaseCRUD[Concept]):
     def get_concepts_by_class(
         self,
         db: Session,
-        class_id: int,
+        class_identifier: str,
         skip: int = 0,
         limit: int = 100,
         locale: Optional[str] = None,
@@ -176,25 +177,28 @@ class ConceptsCRUD(BaseCRUD[Concept]):
 
         Args:
             db: Database session
-            class_id: ID of the concept class
+            class_identifier: ID or name of the concept class
             skip: Number of records to skip
             limit: Maximum number of records to return
 
         Returns:
             List of concepts with the specified class
         """
-        return (
-            self._query_with_names(db, locale=locale)
-            .filter(
-                and_(
-                    Concept.class_id == class_id,
-                    Concept.retired.is_(False),
-                )
+        query = self._query_with_names(db, locale=locale)
+
+        filters = [Concept.retired.is_(False)]
+
+        try:
+            class_id = int(class_identifier)
+            filters.append(Concept.class_id == class_id)
+        except ValueError:
+            query = query.join(
+                ConceptClass,
+                ConceptClass.concept_class_id == Concept.class_id,
             )
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+            filters.append(func.lower(ConceptClass.name) == class_identifier.lower())
+
+        return query.filter(and_(*filters)).offset(skip).limit(limit).all()
 
     def get_concepts_by_creator(
         self,
