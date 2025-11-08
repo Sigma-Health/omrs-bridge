@@ -194,7 +194,7 @@ async def get_concepts_by_class(
     """
     return concepts.get_concepts_by_class(
         db,
-        concept_class=concept_class,
+        class_identifier=concept_class,
         skip=skip,
         limit=limit,
         locale=locale,
