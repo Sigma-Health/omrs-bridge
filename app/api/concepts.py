@@ -54,13 +54,17 @@ async def list_concepts(
         le=1000,
         description="Number of records to return",
     ),
+    locale: Optional[str] = Query(
+        None,
+        description="Locale code to filter concept names",
+    ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
     """
     List concepts with pagination
     """
-    return concepts.list(db, skip=skip, limit=limit)
+    return concepts.list(db, skip=skip, limit=limit, locale=locale)
 
 
 @router.get("/active", response_model=List[ConceptResponse])
@@ -76,13 +80,22 @@ async def list_active_concepts(
         le=1000,
         description="Number of records to return",
     ),
+    locale: Optional[str] = Query(
+        None,
+        description="Locale code to filter concept names",
+    ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
     """
     List active (non-retired) concepts
     """
-    return concepts.get_active_concepts(db, skip=skip, limit=limit)
+    return concepts.get_active_concepts(
+        db,
+        skip=skip,
+        limit=limit,
+        locale=locale,
+    )
 
 
 @router.get("/retired", response_model=List[ConceptResponse])
@@ -98,6 +111,10 @@ async def list_retired_concepts(
         le=1000,
         description="Number of records to return",
     ),
+    locale: Optional[str] = Query(
+        None,
+        description="Locale code to filter concept names",
+    ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
@@ -108,6 +125,7 @@ async def list_retired_concepts(
         db,
         skip=skip,
         limit=limit,
+        locale=locale,
     )
 
 
@@ -128,6 +146,10 @@ async def search_concepts(
         le=1000,
         description="Number of records to return",
     ),
+    locale: Optional[str] = Query(
+        None,
+        description="Locale code to filter concept names",
+    ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
@@ -139,6 +161,7 @@ async def search_concepts(
         name=name,
         skip=skip,
         limit=limit,
+        locale=locale,
     )
 
 
@@ -159,6 +182,10 @@ async def get_concepts_by_class(
         le=1000,
         description="Number of records to return",
     ),
+    locale: Optional[str] = Query(
+        None,
+        description="Locale code to filter concept names",
+    ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
@@ -170,6 +197,7 @@ async def get_concepts_by_class(
         concept_class=concept_class,
         skip=skip,
         limit=limit,
+        locale=locale,
     )
 
 
@@ -190,6 +218,10 @@ async def get_concepts_by_datatype(
         le=1000,
         description="Number of records to return",
     ),
+    locale: Optional[str] = Query(
+        None,
+        description="Locale code to filter concept names",
+    ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
@@ -201,6 +233,7 @@ async def get_concepts_by_datatype(
         datatype=datatype,
         skip=skip,
         limit=limit,
+        locale=locale,
     )
 
 
@@ -213,13 +246,17 @@ async def get_concept_by_short_name(
         ...,
         description="Concept short name",
     ),
+    locale: Optional[str] = Query(
+        None,
+        description="Locale code to filter concept names",
+    ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
     """
     Get concept by short name
     """
-    concept = concepts.get_by_short_name(db, short_name)
+    concept = concepts.get_by_short_name(db, short_name, locale=locale)
     if not concept:
         raise HTTPException(
             status_code=404,
@@ -231,13 +268,17 @@ async def get_concept_by_short_name(
 @router.get("/{concept_id}", response_model=ConceptResponse)
 async def get_concept(
     concept_id: int,
+    locale: Optional[str] = Query(
+        None,
+        description="Locale code to filter concept names",
+    ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
     """
     Get concept by ID
     """
-    concept = concepts.get(db, concept_id)
+    concept = concepts.get(db, concept_id, locale=locale)
     if not concept:
         raise HTTPException(
             status_code=404,
@@ -249,6 +290,10 @@ async def get_concept(
 @router.get("/uuid/{uuid}", response_model=ConceptResponse)
 async def get_concept_by_uuid(
     uuid: str,
+    locale: Optional[str] = Query(
+        None,
+        description="Locale code to filter concept names",
+    ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
@@ -261,7 +306,7 @@ async def get_concept_by_uuid(
             detail="Invalid UUID format",
         )
 
-    concept = concepts.get_by_uuid(db, uuid)
+    concept = concepts.get_by_uuid(db, uuid, locale=locale)
     if not concept:
         raise HTTPException(
             status_code=404,

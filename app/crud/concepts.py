@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, with_loader_criteria
 from sqlalchemy import and_, or_
 from datetime import datetime
 
@@ -19,27 +19,61 @@ class ConceptsCRUD(BaseCRUD[Concept]):
         """Initialize with the Concept model."""
         super().__init__(Concept)
 
-    def _query_with_names(self, db: Session):
-        """Return base concept query with concept names eagerly loaded."""
-        return db.query(Concept).options(selectinload(Concept.names))
+    def _query_with_names(self, db: Session, locale: Optional[str] = None):
+        """Return base concept query with concept names eagerly loaded.
 
-    def list(self, db: Session, skip: int = 0, limit: int = 100) -> List[Concept]:
+        Args:
+            db: Database session
+            locale: Optional locale filter for concept names
+        """
+        query = db.query(Concept).options(selectinload(Concept.names))
+
+        if locale:
+            query = query.options(
+                with_loader_criteria(
+                    ConceptName,
+                    ConceptName.locale == locale,
+                    include_aliases=True,
+                )
+            )
+
+        return query
+
+    def list(
+        self,
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+        locale: Optional[str] = None,
+    ) -> List[Concept]:
         """
         List concepts with eager-loaded names.
         """
-        return self._query_with_names(db).offset(skip).limit(limit).all()
+        return self._query_with_names(db, locale=locale).offset(skip).limit(limit).all()
 
-    def get(self, db: Session, id: int) -> Optional[Concept]:
+    def get(
+        self, db: Session, id: int, locale: Optional[str] = None
+    ) -> Optional[Concept]:
         """
         Get a concept by ID with names eagerly loaded.
         """
-        return self._query_with_names(db).filter(Concept.concept_id == id).first()
+        return (
+            self._query_with_names(db, locale=locale)
+            .filter(Concept.concept_id == id)
+            .first()
+        )
 
-    def get_by_uuid(self, db: Session, uuid: str) -> Optional[Concept]:
+    def get_by_uuid(
+        self, db: Session, uuid: str, locale: Optional[str] = None
+    ) -> Optional[Concept]:
         """
         Get a concept by UUID with names eagerly loaded.
         """
-        return self._query_with_names(db).filter(Concept.uuid == uuid).first()
+        return (
+            self._query_with_names(db, locale=locale)
+            .filter(Concept.uuid == uuid)
+            .first()
+        )
 
     def _set_default_values(self, obj_data: dict) -> None:
         """Set concept-specific default values."""
@@ -50,7 +84,9 @@ class ConceptsCRUD(BaseCRUD[Concept]):
         db_obj.changed_by = update_data.get("changed_by", db_obj.changed_by)
         db_obj.date_changed = datetime.utcnow()
 
-    def get_by_name(self, db: Session, name: str) -> Optional[Concept]:
+    def get_by_name(
+        self, db: Session, name: str, locale: Optional[str] = None
+    ) -> Optional[Concept]:
         """
         Get concept by short name.
 
@@ -61,9 +97,23 @@ class ConceptsCRUD(BaseCRUD[Concept]):
         Returns:
             The concept if found, None otherwise
         """
-        return self._query_with_names(db).filter(Concept.short_name == name).first()
+        return (
+            self._query_with_names(db, locale=locale)
+            .filter(Concept.short_name == name)
+            .first()
+        )
 
-    def get_by_description(self, db: Session, description: str) -> Optional[Concept]:
+    def get_by_short_name(
+        self, db: Session, short_name: str, locale: Optional[str] = None
+    ) -> Optional[Concept]:
+        """
+        Compatibility helper for APIs that reference get_by_short_name.
+        """
+        return self.get_by_name(db, short_name, locale=locale)
+
+    def get_by_description(
+        self, db: Session, description: str, locale: Optional[str] = None
+    ) -> Optional[Concept]:
         """
         Get concept by description.
 
@@ -75,13 +125,18 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             The concept if found, None otherwise
         """
         return (
-            self._query_with_names(db)
+            self._query_with_names(db, locale=locale)
             .filter(Concept.description == description)
             .first()
         )
 
     def get_concepts_by_datatype(
-        self, db: Session, datatype_id: int, skip: int = 0, limit: int = 100
+        self,
+        db: Session,
+        datatype_id: int,
+        skip: int = 0,
+        limit: int = 100,
+        locale: Optional[str] = None,
     ) -> List[Concept]:
         """
         Get concepts for a specific datatype.
@@ -96,15 +151,25 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             List of concepts with the specified datatype
         """
         return (
-            self._query_with_names(db)
-            .filter(and_(Concept.datatype_id == datatype_id, Concept.retired == False))
+            self._query_with_names(db, locale=locale)
+            .filter(
+                and_(
+                    Concept.datatype_id == datatype_id,
+                    Concept.retired.is_(False),
+                )
+            )
             .offset(skip)
             .limit(limit)
             .all()
         )
 
     def get_concepts_by_class(
-        self, db: Session, class_id: int, skip: int = 0, limit: int = 100
+        self,
+        db: Session,
+        class_id: int,
+        skip: int = 0,
+        limit: int = 100,
+        locale: Optional[str] = None,
     ) -> List[Concept]:
         """
         Get concepts for a specific class.
@@ -119,15 +184,25 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             List of concepts with the specified class
         """
         return (
-            self._query_with_names(db)
-            .filter(and_(Concept.class_id == class_id, Concept.retired == False))
+            self._query_with_names(db, locale=locale)
+            .filter(
+                and_(
+                    Concept.class_id == class_id,
+                    Concept.retired.is_(False),
+                )
+            )
             .offset(skip)
             .limit(limit)
             .all()
         )
 
     def get_concepts_by_creator(
-        self, db: Session, creator: int, skip: int = 0, limit: int = 100
+        self,
+        db: Session,
+        creator: int,
+        skip: int = 0,
+        limit: int = 100,
+        locale: Optional[str] = None,
     ) -> List[Concept]:
         """
         Get concepts created by a specific user.
@@ -142,15 +217,25 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             List of concepts created by the specified user
         """
         return (
-            self._query_with_names(db)
-            .filter(and_(Concept.creator == creator, Concept.retired == False))
+            self._query_with_names(db, locale=locale)
+            .filter(
+                and_(
+                    Concept.creator == creator,
+                    Concept.retired.is_(False),
+                )
+            )
             .offset(skip)
             .limit(limit)
             .all()
         )
 
     def search_concepts(
-        self, db: Session, name: str, skip: int = 0, limit: int = 100
+        self,
+        db: Session,
+        name: str,
+        skip: int = 0,
+        limit: int = 100,
+        locale: Optional[str] = None,
     ) -> List[Concept]:
         """
         Search concepts by short_name, description, or concept names.
@@ -166,11 +251,11 @@ class ConceptsCRUD(BaseCRUD[Concept]):
         """
         search_term = f"%{name}%"
         query = (
-            self._query_with_names(db)
+            self._query_with_names(db, locale=locale)
             .outerjoin(ConceptName, ConceptName.concept_id == Concept.concept_id)
             .filter(
                 and_(
-                    Concept.retired == False,
+                    Concept.retired.is_(False),
                     or_(
                         Concept.short_name.ilike(search_term),
                         Concept.description.ilike(search_term),
@@ -180,41 +265,61 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             )
             .distinct()
         )
+        if locale:
+            query = query.filter(ConceptName.locale == locale)
+
         return query.offset(skip).limit(limit).all()
 
     def search_concepts_by_name(
-        self, db: Session, name: str, skip: int = 0, limit: int = 100
+        self,
+        db: Session,
+        name: str,
+        skip: int = 0,
+        limit: int = 100,
+        locale: Optional[str] = None,
     ) -> List[Concept]:
         """
         Compatibility method for the previous API; forwards to search_concepts.
         """
-        return self.search_concepts(db, name, skip, limit)
+        return self.search_concepts(
+            db,
+            name,
+            skip,
+            limit,
+            locale,
+        )
 
     def get_active_concepts(
-        self, db: Session, skip: int = 0, limit: int = 100
+        self,
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+        locale: Optional[str] = None,
     ) -> List[Concept]:
         """
         Get only active (non-retired) concepts.
         """
         return (
-            self._query_with_names(db)
-            .filter(Concept.retired == False)
+            self._query_with_names(db, locale=locale)
+            .filter(Concept.retired.is_(False))
             .offset(skip)
             .limit(limit)
             .all()
         )
 
     def get_retired_concepts(
-        self, db: Session, skip: int = 0, limit: int = 100
+        self,
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+        locale: Optional[str] = None,
     ) -> List[Concept]:
         """
         Get only retired concepts.
         """
         return (
-            self._query_with_names(db)
-            .filter(
-                Concept.retired == True  # noqa: E712
-            )
+            self._query_with_names(db, locale=locale)
+            .filter(Concept.retired.is_(True))
             .offset(skip)
             .limit(limit)
             .all()
