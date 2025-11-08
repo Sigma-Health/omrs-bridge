@@ -14,6 +14,7 @@ from app.auth import get_current_api_key
 from app.database import get_db
 from app.crud import drugs
 from app.schemas import (
+    DrugCreate,
     DrugReplace,
     DrugUpdate,
     DrugResponse,
@@ -29,12 +30,12 @@ router = APIRouter(tags=["drugs"])
 
 @router.post("/", response_model=DrugResponse)
 async def create_drug(
-    drug_create: DrugReplace,
+    drug_create: DrugCreate,
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
     """
-    Create a new drug.
+    Create a new drug with the minimal required fields.
     """
     try:
         return drugs.create(db, drug_create)
