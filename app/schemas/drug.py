@@ -30,7 +30,7 @@ class DrugCreate(DrugBase):
 
     concept_id: int
     name: str
-    creator: int
+    creator: Optional[int] = None
     combination: Optional[bool] = None
     dosage_form: Optional[int] = None
     maximum_daily_dose: Optional[float] = None

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from .base import BaseCRUD
 from app.models import Drug
+from app.config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class DrugsCRUD(BaseCRUD[Drug]):
         """Set drug-specific default values."""
         obj_data.setdefault("retired", False)
         obj_data.setdefault("combination", False)
+        obj_data.setdefault("creator", settings.default_creator_id)
 
     def _set_audit_fields(self, db_obj: Drug, update_data: dict) -> None:
         """Set drug-specific audit fields."""

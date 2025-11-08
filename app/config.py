@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # Debug mode
     debug: bool = False
 
+    # Default OpenMRS user ID to attribute new records to when not provided
+    default_creator_id: int = 1
+
     class Config:
         env_file = ".env"
         case_sensitive = False
