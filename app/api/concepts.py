@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.auth import get_current_api_key
 from app.crud import concepts
+from app.services.search_index import trigger_search_index_update
 from app.schemas import (
     ConceptUpdate,
     ConceptReplace,
@@ -33,7 +34,23 @@ async def create_concept(
     Create a new concept
     """
     try:
-        return concepts.create(db, concept_create)
+        created_concept = concepts.create(db, concept_create)
+
+        # Trigger search index update; log on failure but do not block response.
+        try:
+            await trigger_search_index_update(
+                resource="concept",
+                uuid=created_concept.uuid,
+                async_mode=False,
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Search index update invocation failed for concept %s: %s",
+                getattr(created_concept, "uuid", "unknown"),
+                exc,
+            )
+
+        return created_concept
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -347,10 +364,25 @@ async def update_concept_partial(
             updated_concept,
         )
 
-        return ConceptUpdateResponse(
+        response_payload = ConceptUpdateResponse(
             concept=updated_concept,
             updated_fields=updated_fields,
         )
+
+        try:
+            await trigger_search_index_update(
+                resource="concept",
+                uuid=updated_concept.uuid,
+                async_mode=False,
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Search index update invocation failed for concept %s: %s",
+                getattr(updated_concept, "uuid", "unknown"),
+                exc,
+            )
+
+        return response_payload
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -396,10 +428,25 @@ async def update_concept_partial_by_uuid(
             updated_concept,
         )
 
-        return ConceptUpdateResponse(
+        response_payload = ConceptUpdateResponse(
             concept=updated_concept,
             updated_fields=updated_fields,
         )
+
+        try:
+            await trigger_search_index_update(
+                resource="concept",
+                uuid=updated_concept.uuid,
+                async_mode=False,
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Search index update invocation failed for concept %s: %s",
+                getattr(updated_concept, "uuid", "unknown"),
+                exc,
+            )
+
+        return response_payload
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -439,10 +486,25 @@ async def update_concept_full(
             updated_concept,
         )
 
-        return ConceptUpdateResponse(
+        response_payload = ConceptUpdateResponse(
             concept=updated_concept,
             updated_fields=updated_fields,
         )
+
+        try:
+            await trigger_search_index_update(
+                resource="concept",
+                uuid=updated_concept.uuid,
+                async_mode=False,
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Search index update invocation failed for concept %s: %s",
+                getattr(updated_concept, "uuid", "unknown"),
+                exc,
+            )
+
+        return response_payload
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -488,10 +550,25 @@ async def update_concept_full_by_uuid(
             updated_concept,
         )
 
-        return ConceptUpdateResponse(
+        response_payload = ConceptUpdateResponse(
             concept=updated_concept,
             updated_fields=updated_fields,
         )
+
+        try:
+            await trigger_search_index_update(
+                resource="concept",
+                uuid=updated_concept.uuid,
+                async_mode=False,
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Search index update invocation failed for concept %s: %s",
+                getattr(updated_concept, "uuid", "unknown"),
+                exc,
+            )
+
+        return response_payload
     except Exception as e:
         raise HTTPException(
             status_code=400,

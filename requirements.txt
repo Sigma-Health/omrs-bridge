@@ -10,9 +10,8 @@ passlib[bcrypt]==1.7.4
 python-dotenv==1.0.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
-# HTTP client for external OpenMRS REST calls
-httpx==0.25.0
 # Performance optimization libraries
 orjson==3.9.10
 ujson==5.8.0
 gunicorn==21.2.0 
+httpx==0.25.0

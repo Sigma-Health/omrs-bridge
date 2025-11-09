@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_api_key
 from app.database import get_db
 from app.crud import drugs
+from app.services.search_index import trigger_search_index_update
 from app.schemas import (
     DrugCreate,
     DrugReplace,
@@ -38,7 +39,23 @@ async def create_drug(
     Create a new drug with the minimal required fields.
     """
     try:
-        return drugs.create(db, drug_create)
+        created_drug = drugs.create(db, drug_create)
+
+        # Attempt to update the OpenMRS search index; failure should not block the response.
+        try:
+            await trigger_search_index_update(
+                resource="drug",
+                uuid=created_drug.uuid,
+                async_mode=False,
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Search index update invocation failed for drug %s: %s",
+                getattr(created_drug, "uuid", "unknown"),
+                exc,
+            )
+
+        return created_drug
     except Exception as exc:
         logger.error("Failed to create drug: %s", exc)
         raise HTTPException(
