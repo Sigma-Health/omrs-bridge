@@ -20,6 +20,13 @@ services:
       # Application settings
       - PORT=1221
       - HOST=0.0.0.0
+
+      # OpenMRS REST configuration
+      - OPENMRS_BASE_URL=${OPENMRS_BASE_URL:-http://bahmni-standard-openmrs-1:8080/openmrs}
+      - OPENMRS_REST_USERNAME=${OPENMRS_REST_USERNAME:-admin}
+      - OPENMRS_REST_PASSWORD=${OPENMRS_REST_PASSWORD:-Admin123}
+      - OPENMRS_REST_TIMEOUT_SECONDS=${OPENMRS_REST_TIMEOUT_SECONDS:-10.0}
+      - OPENMRS_REST_VERIFY_SSL=${OPENMRS_REST_VERIFY_SSL:-true}
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
