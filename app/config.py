@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     # Default OpenMRS user ID to attribute new records to when not provided
     default_creator_id: int = 1
 
+    # OpenMRS REST configuration
+    openmrs_base_url: str = "http://localhost:8080/openmrs"
+    openmrs_rest_username: str | None = None
+    openmrs_rest_password: str | None = None
+    openmrs_rest_timeout_seconds: float = 10.0
+
     class Config:
         env_file = ".env"
         case_sensitive = False
