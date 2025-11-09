@@ -11,6 +11,7 @@ from app.api.diagnoses import router as diagnoses_router
 from app.api.encounters import router as encounters_router
 from app.api.order_types import router as order_types_router
 from app.api.drugs import router as drugs_router
+from app.api.system import router as system_router
 from app.api.visits import router as visits_router
 from app.api.vitals import router as vitals_router
 from app.config import settings
@@ -123,6 +124,11 @@ app.include_router(
     drugs_router,
     prefix="/api/v1/drugs",
     tags=["drugs"],
+)
+app.include_router(
+    system_router,
+    prefix="/api/v1/system",
+    tags=["system"],
 )
 
 
