@@ -42,20 +42,36 @@ async def create_drug(
         created_drug = drugs.create(db, drug_create)
 
         # Attempt to update the OpenMRS search index; failure should not block the response.
+        status_text: Optional[str] = None
         try:
-            await trigger_search_index_update(
+            result = await trigger_search_index_update(
                 resource="drug",
                 uuid=created_drug.uuid,
                 async_mode=False,
             )
+            status_text = result.status_text()
+            if not result.success:
+                logger.warning(
+                    "Search index update returned failure for drug %s: %s",
+                    getattr(created_drug, "uuid", "unknown"),
+                    result.message,
+                )
         except Exception as exc:  # pragma: no cover - defensive logging
+            status_text = f"failed: {exc}"
             logger.warning(
                 "Search index update invocation failed for drug %s: %s",
                 getattr(created_drug, "uuid", "unknown"),
                 exc,
             )
 
-        return created_drug
+        response_payload = DrugResponse.model_validate(
+            created_drug,
+            from_attributes=True,
+        )
+        if status_text:
+            response_payload.search_index_update_status = status_text
+
+        return response_payload
     except Exception as exc:
         logger.error("Failed to create drug: %s", exc)
         raise HTTPException(

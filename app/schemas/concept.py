@@ -84,6 +84,7 @@ class ConceptResponse(ConceptBase):
     date_retired: Optional[datetime] = None
     preferred_name: Optional[str] = None
     names: List[ConceptNameResponse] = Field(default_factory=list, alias="active_names")
+    search_index_update_status: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -98,3 +99,4 @@ class ConceptUpdateResponse(BaseModel):
     concept_id: int
     updated_fields: list[str]
     concept: Optional[ConceptResponse] = None
+    search_index_update_status: Optional[str] = None

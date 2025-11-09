@@ -80,6 +80,7 @@ class DrugResponse(DrugBase):
     retired_by: Optional[int] = None
     date_retired: Optional[datetime] = None
     date_changed: Optional[datetime] = None
+    search_index_update_status: Optional[str] = None
 
     class Config:
         from_attributes = True
