@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 
 from fastapi import (
@@ -20,6 +21,8 @@ from app.schemas import (
     ConceptUpdateResponse,
 )
 from app.utils import validate_uuid
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["concepts"])
 
@@ -182,6 +185,10 @@ async def search_concepts(
         None,
         description="Locale code to filter concept names",
     ),
+    concept_class: Optional[str] = Query(
+        None,
+        description="Filter by concept class (ID or name).",
+    ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
@@ -194,6 +201,7 @@ async def search_concepts(
         skip=skip,
         limit=limit,
         locale=locale,
+        class_identifier=concept_class,
     )
 
 

@@ -240,6 +240,7 @@ class ConceptsCRUD(BaseCRUD[Concept]):
         skip: int = 0,
         limit: int = 100,
         locale: Optional[str] = None,
+        class_identifier: Optional[str] = None,
     ) -> List[Concept]:
         """
         Search concepts by short_name, description, or concept names.
@@ -269,6 +270,15 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             )
             .distinct()
         )
+        if class_identifier:
+            try:
+                class_id = int(class_identifier)
+                query = query.filter(Concept.class_id == class_id)
+            except ValueError:
+                query = query.join(
+                    ConceptClass,
+                    ConceptClass.concept_class_id == Concept.class_id,
+                ).filter(func.lower(ConceptClass.name) == class_identifier.lower())
         if locale:
             query = query.filter(ConceptName.locale == locale)
 
@@ -281,6 +291,7 @@ class ConceptsCRUD(BaseCRUD[Concept]):
         skip: int = 0,
         limit: int = 100,
         locale: Optional[str] = None,
+        class_identifier: Optional[str] = None,
     ) -> List[Concept]:
         """
         Compatibility method for the previous API; forwards to search_concepts.
@@ -291,6 +302,7 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             skip,
             limit,
             locale,
+            class_identifier,
         )
 
     def get_active_concepts(
