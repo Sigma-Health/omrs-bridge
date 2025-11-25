@@ -104,6 +104,13 @@ from .vitals import (
     PatientVitalsInfo,
     EncounterVitalsInfo,
 )
+from .provider import (
+    ProviderBase,
+    ProviderResponse,
+    ProviderListResponse,
+    PersonInfo as ProviderPersonInfo,
+    PersonNameInfo,
+)
 
 __all__ = [
     # Base
@@ -199,4 +206,10 @@ __all__ = [
     "VitalsByType",
     "PatientVitalsInfo",
     "EncounterVitalsInfo",
+    # Provider
+    "ProviderBase",
+    "ProviderResponse",
+    "ProviderListResponse",
+    "ProviderPersonInfo",
+    "PersonNameInfo",
 ]

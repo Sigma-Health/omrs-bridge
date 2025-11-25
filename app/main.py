@@ -14,6 +14,7 @@ from app.api.drugs import router as drugs_router
 from app.api.system import router as system_router
 from app.api.visits import router as visits_router
 from app.api.vitals import router as vitals_router
+from app.api.provider import router as provider_router
 from app.config import settings
 from app.auth import generate_api_key
 
@@ -129,6 +130,11 @@ app.include_router(
     system_router,
     prefix="/api/v1/system",
     tags=["system"],
+)
+app.include_router(
+    provider_router,
+    prefix="/api/v1/providers",
+    tags=["providers"],
 )
 
 
