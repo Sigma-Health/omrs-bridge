@@ -98,7 +98,7 @@ class ProvidersCRUD(BaseCRUD[Provider]):
                     voided=person.voided,
                 )
 
-                # Get preferred person name
+                # Get person name - prefer preferred, non-voided, but fall back to any non-voided
                 person_name = (
                     db.query(PersonName)
                     .filter(
@@ -110,6 +110,29 @@ class ProvidersCRUD(BaseCRUD[Provider]):
                     )
                     .first()
                 )
+
+                # If no preferred name found, get any non-voided name (most recent first)
+                if not person_name:
+                    person_name = (
+                        db.query(PersonName)
+                        .filter(
+                            and_(
+                                PersonName.person_id == provider.person_id,
+                                PersonName.voided == False,  # noqa: E712
+                            )
+                        )
+                        .order_by(PersonName.person_name_id.desc())
+                        .first()
+                    )
+
+                # If still no name found, get any name (even if voided) as last resort (most recent first)
+                if not person_name:
+                    person_name = (
+                        db.query(PersonName)
+                        .filter(PersonName.person_id == provider.person_id)
+                        .order_by(PersonName.person_name_id.desc())
+                        .first()
+                    )
 
                 if person_name:
                     full_name = self._build_full_name(person_name)
@@ -218,4 +241,3 @@ class ProvidersCRUD(BaseCRUD[Provider]):
             skip=skip,
             limit=limit,
         )
-
