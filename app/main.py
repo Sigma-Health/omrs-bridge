@@ -15,6 +15,7 @@ from app.api.system import router as system_router
 from app.api.visits import router as visits_router
 from app.api.vitals import router as vitals_router
 from app.api.provider import router as provider_router
+from app.api.visit_types import router as visit_types_router
 from app.config import settings
 from app.auth import generate_api_key
 
@@ -135,6 +136,11 @@ app.include_router(
     provider_router,
     prefix="/api/v1/providers",
     tags=["providers"],
+)
+app.include_router(
+    visit_types_router,
+    prefix="/api/v1/visit-types",
+    tags=["visit-types"],
 )
 
 

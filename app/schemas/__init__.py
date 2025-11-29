@@ -111,6 +111,14 @@ from .provider import (
     PersonInfo as ProviderPersonInfo,
     PersonNameInfo,
 )
+from .visit_type import (
+    VisitTypeBase,
+    VisitTypeCreate,
+    VisitTypeUpdate,
+    VisitTypeReplace,
+    VisitTypeResponse,
+    VisitTypeUpdateResponse,
+)
 
 __all__ = [
     # Base
@@ -212,4 +220,11 @@ __all__ = [
     "ProviderListResponse",
     "ProviderPersonInfo",
     "PersonNameInfo",
+    # Visit Type
+    "VisitTypeBase",
+    "VisitTypeCreate",
+    "VisitTypeUpdate",
+    "VisitTypeReplace",
+    "VisitTypeResponse",
+    "VisitTypeUpdateResponse",
 ]

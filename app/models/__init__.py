@@ -26,6 +26,7 @@ from .patient import Patient
 from .person import Person, PersonName
 from .provider import Provider
 from .visit import Visit
+from .visit_type import VisitType
 
 __all__ = [
     "Base",
@@ -48,4 +49,5 @@ __all__ = [
     "PersonName",
     "Provider",
     "Visit",
+    "VisitType",
 ]

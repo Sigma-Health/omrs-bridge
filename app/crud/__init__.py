@@ -14,6 +14,7 @@ from .order_types import OrderTypesCRUD
 from .visits import VisitsCRUD
 from .vitals import VitalsCRUD
 from .provider import ProvidersCRUD
+from .visit_types import VisitTypesCRUD
 
 # Initialize CRUD instances for easy access
 concepts = ConceptsCRUD()
@@ -26,6 +27,7 @@ order_types = OrderTypesCRUD()
 visits = VisitsCRUD()
 vitals = VitalsCRUD()
 providers = ProvidersCRUD()
+visit_types = VisitTypesCRUD()
 
 __all__ = [
     "BaseCRUD",
@@ -39,6 +41,7 @@ __all__ = [
     "VisitsCRUD",
     "VitalsCRUD",
     "ProvidersCRUD",
+    "VisitTypesCRUD",
     "concepts",
     "diagnoses",
     "encounters",
@@ -49,4 +52,5 @@ __all__ = [
     "visits",
     "vitals",
     "providers",
+    "visit_types",
 ]
