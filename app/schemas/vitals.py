@@ -91,3 +91,77 @@ class VitalsGroupedResponse(BaseModel):
     encounter: EncounterVitalsInfo
     vitals_by_type: List[VitalsByType]
     total_count: int
+
+
+class VitalCreate(BaseModel):
+    """Schema for creating a vital sign observation"""
+
+    person_id: int
+    concept_id: int
+    encounter_id: int
+    creator: int
+    # Value fields - at least one must be provided
+    value_numeric: Optional[float] = None
+    value_text: Optional[str] = None
+    value_coded: Optional[int] = None
+    value_datetime: Optional[datetime] = None
+    # Optional fields
+    obs_datetime: Optional[datetime] = None
+    location_id: Optional[int] = None
+    obs_group_id: Optional[int] = None
+    order_id: Optional[int] = None
+    comments: Optional[str] = None
+    status: Optional[str] = "FINAL"
+    interpretation: Optional[str] = None
+    value_modifier: Optional[str] = None
+    form_namespace_and_path: Optional[str] = None
+
+
+class VitalUpdate(BaseModel):
+    """Schema for updating a vital sign observation (PATCH)"""
+
+    # Value fields
+    value_numeric: Optional[float] = None
+    value_text: Optional[str] = None
+    value_coded: Optional[int] = None
+    value_datetime: Optional[datetime] = None
+    # Optional fields
+    obs_datetime: Optional[datetime] = None
+    comments: Optional[str] = None
+    status: Optional[str] = None
+    interpretation: Optional[str] = None
+    value_modifier: Optional[str] = None
+
+
+class VitalReplace(BaseModel):
+    """Schema for replacing a vital sign observation (PUT)"""
+
+    person_id: int
+    concept_id: int
+    encounter_id: int
+    creator: int
+    # Value fields - at least one must be provided
+    value_numeric: Optional[float] = None
+    value_text: Optional[str] = None
+    value_coded: Optional[int] = None
+    value_datetime: Optional[datetime] = None
+    # Optional fields
+    obs_datetime: Optional[datetime] = None
+    location_id: Optional[int] = None
+    obs_group_id: Optional[int] = None
+    order_id: Optional[int] = None
+    comments: Optional[str] = None
+    status: Optional[str] = "FINAL"
+    interpretation: Optional[str] = None
+    value_modifier: Optional[str] = None
+    form_namespace_and_path: Optional[str] = None
+
+
+class VitalUpdateResponse(BaseModel):
+    """Schema for vital update response"""
+
+    success: bool
+    message: str
+    obs_id: int
+    updated_fields: List[str]
+    vital: Optional[VitalSign] = None

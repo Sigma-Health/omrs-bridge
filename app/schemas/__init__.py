@@ -103,6 +103,10 @@ from .vitals import (
     VitalsByType,
     PatientVitalsInfo,
     EncounterVitalsInfo,
+    VitalCreate,
+    VitalUpdate,
+    VitalReplace,
+    VitalUpdateResponse,
 )
 from .provider import (
     ProviderBase,
@@ -214,6 +218,10 @@ __all__ = [
     "VitalsByType",
     "PatientVitalsInfo",
     "EncounterVitalsInfo",
+    "VitalCreate",
+    "VitalUpdate",
+    "VitalReplace",
+    "VitalUpdateResponse",
     # Provider
     "ProviderBase",
     "ProviderResponse",
