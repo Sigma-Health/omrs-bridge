@@ -300,6 +300,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         patient_id: Optional[int] = None,
+        location_id: Optional[int] = None,
         days: Optional[int] = None,
         skip: int = 0,
         limit: int = 100,
@@ -314,6 +315,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
             start_date: Optional start date (YYYY-MM-DD format)
             end_date: Optional end date (YYYY-MM-DD format)
             patient_id: Optional patient ID to filter by
+            location_id: Optional location ID to filter by
             days: Optional number of days to look back from today (e.g., 1 for today)
             skip: Number of records to skip
             limit: Maximum number of records to return
@@ -396,6 +398,10 @@ class VisitsCRUD(BaseCRUD[Visit]):
         # Apply patient filter if provided
         if patient_id:
             query = query.filter(self.model.patient_id == patient_id)
+
+        # Apply location filter if provided
+        if location_id:
+            query = query.filter(self.model.location_id == location_id)
 
         results = (
             query.order_by(self.model.date_started.desc())

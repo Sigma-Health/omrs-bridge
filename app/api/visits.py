@@ -297,6 +297,10 @@ async def get_visits_with_order_type_enriched(
         None,
         description="Filter by patient ID",
     ),
+    location_id: Optional[int] = Query(
+        None,
+        description="Filter by location ID",
+    ),
     days: Optional[int] = Query(
         None,
         ge=1,
@@ -319,7 +323,7 @@ async def get_visits_with_order_type_enriched(
     """
     Get visits that have orders of a particular order type.
     This endpoint returns visits with patient details (name, gender, birthdate)
-    You can filter by date range, patient ID, or number of days.
+    You can filter by date range, patient ID, location ID, or number of days.
     """
     return visits.get_visits_with_order_type_and_patient_info(
         db,
@@ -327,6 +331,7 @@ async def get_visits_with_order_type_enriched(
         start_date=start_date,
         end_date=end_date,
         patient_id=patient_id,
+        location_id=location_id,
         days=days,
         skip=skip,
         limit=limit,
