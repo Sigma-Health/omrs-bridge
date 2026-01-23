@@ -155,6 +155,242 @@ def get_orders_with_enrichment_sql() -> str:
     """
 
 
+def get_drug_orders_with_enrichment_sql() -> str:
+    """
+    Get the SQL query for drug orders (order_type_id=2) with enrichment data.
+    Includes drug_order and drug table joins with concept name resolution.
+    """
+    return """
+    SELECT 
+        o.order_id,
+        o.order_type_id,
+        o.concept_id,
+        o.orderer,
+        o.encounter_id,
+        o.instructions,
+        o.date_activated,
+        o.auto_expire_date,
+        o.date_stopped,
+        o.order_reason,
+        o.order_reason_non_coded,
+        o.creator,
+        o.date_created,
+        o.voided,
+        o.voided_by,
+        o.date_voided,
+        o.void_reason,
+        o.patient_id,
+        o.accession_number,
+        o.uuid,
+        o.urgency,
+        o.order_number,
+        o.previous_order_id,
+        o.order_action,
+        o.comment_to_fulfiller,
+        o.care_setting,
+        o.scheduled_date,
+        o.order_group_id,
+        o.sort_weight,
+        o.fulfiller_comment,
+        o.fulfiller_status,
+        o.form_namespace_and_path,
+        
+        -- Provider information
+        p.provider_id,
+        p.name AS provider_name,
+        p.identifier AS provider_identifier,
+        p.uuid AS provider_uuid,
+        
+        -- Orderer person information
+        op.person_id AS orderer_person_id,
+        op.uuid AS orderer_uuid,
+        op.gender AS orderer_gender,
+        op.birthdate AS orderer_birthdate,
+        
+        -- Orderer name information
+        opn.given_name AS orderer_given_name,
+        opn.family_name AS orderer_family_name,
+        opn.prefix AS orderer_prefix,
+        opn.middle_name AS orderer_middle_name,
+        opn.family_name2 AS orderer_family_name2,
+        opn.family_name_suffix AS orderer_family_name_suffix,
+        
+        -- Patient person information
+        pt.person_id AS patient_person_id,
+        pt.uuid AS patient_uuid,
+        pt.gender AS patient_gender,
+        pt.birthdate AS patient_birthdate,
+        
+        -- Patient name information
+        ptn.given_name AS patient_given_name,
+        ptn.family_name AS patient_family_name,
+        ptn.prefix AS patient_prefix,
+        ptn.middle_name AS patient_middle_name,
+        ptn.family_name2 AS patient_family_name2,
+        ptn.family_name_suffix AS patient_family_name_suffix,
+        
+        -- Concept information
+        c.concept_id AS concept_id,
+        c.uuid AS concept_uuid,
+        COALESCE(short_cn.name, c.short_name) AS concept_short_name,
+        c.description AS concept_description,
+        c.is_set AS concept_is_set,
+        
+        -- Concept name information
+        cn.concept_name_id AS concept_name_id,
+        cn.name AS concept_name,
+        cn.locale AS concept_name_locale,
+        cn.locale_preferred AS concept_name_locale_preferred,
+        cn.concept_name_type AS concept_name_type,
+        
+        -- Drug order information
+        do.order_id AS drug_order_id,
+        do.drug_inventory_id,
+        do.dose,
+        do.as_needed,
+        do.dosing_type,
+        do.quantity,
+        do.as_needed_condition,
+        do.num_refills,
+        do.dosing_instructions,
+        do.duration,
+        do.duration_units,
+        do.quantity_units,
+        do.route AS drug_order_route,
+        do.dose_units,
+        do.frequency,
+        do.brand_name,
+        do.dispense_as_written,
+        do.drug_non_coded,
+        
+        -- Drug information
+        d.drug_id,
+        d.concept_id AS drug_concept_id,
+        d.name AS drug_name,
+        d.uuid AS drug_uuid,
+        d.combination AS drug_combination,
+        d.strength AS drug_strength,
+        d.dosage_form AS drug_dosage_form,
+        d.route AS drug_route,
+        
+        -- Concept names for drug_order units/frequency
+        duration_cn.name AS duration_units_name,
+        quantity_cn.name AS quantity_units_name,
+        route_cn.name AS route_name,
+        dose_cn.name AS dose_units_name,
+        frequency_cn.name AS frequency_name
+
+    FROM orders o
+
+    -- Join with encounter and visit
+    INNER JOIN encounter e ON o.encounter_id = e.encounter_id
+    INNER JOIN visit v ON e.visit_id = v.visit_id
+
+    -- Join for orderer information through provider table
+    LEFT OUTER JOIN provider p ON (
+        p.provider_id = o.orderer 
+        AND p.retired = false
+    )
+
+    LEFT OUTER JOIN person op ON (
+        op.person_id = p.person_id 
+        AND op.voided = false
+    )
+
+    LEFT OUTER JOIN person_name opn ON (
+        opn.person_id = o.orderer 
+        AND opn.preferred = true 
+        AND opn.voided = false
+    )
+
+    -- Join for patient information
+    LEFT OUTER JOIN person pt ON (
+        pt.person_id = o.patient_id 
+        AND pt.voided = false
+    )
+
+    LEFT OUTER JOIN person_name ptn ON (
+        ptn.person_id = o.patient_id 
+        AND ptn.preferred = true 
+        AND ptn.voided = false
+    )
+
+    -- Join for concept information
+    LEFT OUTER JOIN concept c ON (
+        c.concept_id = o.concept_id 
+        AND c.retired = false
+    )
+
+    -- Join for concept name information (English locale, FULLY_SPECIFIED type)
+    LEFT OUTER JOIN concept_name cn ON (
+        cn.concept_id = c.concept_id 
+        AND cn.locale = 'en'
+        AND cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND cn.voided = false
+    )
+
+    -- Join for SHORT concept name (to populate short_name field)
+    LEFT OUTER JOIN concept_name short_cn ON (
+        short_cn.concept_id = c.concept_id 
+        AND short_cn.locale = 'en'
+        AND short_cn.concept_name_type = 'SHORT'
+        AND short_cn.voided = false
+    )
+    
+    -- Join for drug_order table
+    LEFT OUTER JOIN drug_order do ON (
+        do.order_id = o.order_id
+    )
+    
+    -- Join for drug table
+    LEFT OUTER JOIN drug d ON (
+        d.drug_id = do.drug_inventory_id
+        AND d.retired = false
+    )
+    
+    -- Join for concept names of drug_order units/frequency
+    LEFT OUTER JOIN concept_name duration_cn ON (
+        duration_cn.concept_id = do.duration_units
+        AND duration_cn.locale = 'en'
+        AND duration_cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND duration_cn.voided = false
+    )
+    
+    LEFT OUTER JOIN concept_name quantity_cn ON (
+        quantity_cn.concept_id = do.quantity_units
+        AND quantity_cn.locale = 'en'
+        AND quantity_cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND quantity_cn.voided = false
+    )
+    
+    LEFT OUTER JOIN concept_name route_cn ON (
+        route_cn.concept_id = do.route
+        AND route_cn.locale = 'en'
+        AND route_cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND route_cn.voided = false
+    )
+    
+    LEFT OUTER JOIN concept_name dose_cn ON (
+        dose_cn.concept_id = do.dose_units
+        AND dose_cn.locale = 'en'
+        AND dose_cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND dose_cn.voided = false
+    )
+    
+    LEFT OUTER JOIN concept_name frequency_cn ON (
+        frequency_cn.concept_id = do.frequency
+        AND frequency_cn.locale = 'en'
+        AND frequency_cn.concept_name_type = 'FULLY_SPECIFIED'
+        AND frequency_cn.voided = false
+    )
+
+    WHERE {where_clause}
+
+    ORDER BY o.order_id
+    LIMIT :limit OFFSET :skip
+    """
+
+
 def get_single_order_with_expansion_sql() -> str:
     """
     Get a single order with enrichment details and conditional expansion.

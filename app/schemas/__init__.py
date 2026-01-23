@@ -57,6 +57,12 @@ from .drug import (
     DrugResponse,
     DrugUpdateResponse,
 )
+from .drug_order import (
+    DrugOrderInfo,
+    DrugInfo,
+    DosingInstructions,
+    ConceptNameInfo as DrugOrderConceptNameInfo,
+)
 from .system import (
     SearchIndexRebuildRequest,
     SearchIndexRebuildResponse,
@@ -177,6 +183,11 @@ __all__ = [
     "DrugReplace",
     "DrugResponse",
     "DrugUpdateResponse",
+    # Drug Order
+    "DrugOrderInfo",
+    "DrugInfo",
+    "DosingInstructions",
+    "DrugOrderConceptNameInfo",
     # System
     "SearchIndexRebuildRequest",
     "SearchIndexRebuildResponse",

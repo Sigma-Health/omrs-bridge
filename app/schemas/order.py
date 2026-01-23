@@ -3,8 +3,11 @@ Order schemas.
 """
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from .drug_order import DrugOrderInfo
 
 
 class PersonInfo(BaseModel):
@@ -108,6 +111,7 @@ class OrderResponse(OrderBase):
     patient_info: Optional[PersonInfo] = None
     orderer_info: Optional[OrdererInfo] = None
     concept_info: Optional[ConceptInfo] = None
+    drug_order_info: Optional["DrugOrderInfo"] = None
 
     class Config:
         from_attributes = True

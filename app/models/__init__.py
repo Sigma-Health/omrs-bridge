@@ -21,6 +21,7 @@ from .encounter import Encounter
 from .obs import Obs
 from .order import Order
 from .drug import Drug
+from .drug_order import DrugOrder
 from .order_type import OrderType
 from .patient import Patient
 from .person import Person, PersonName
@@ -43,6 +44,7 @@ __all__ = [
     "Obs",
     "Order",
     "Drug",
+    "DrugOrder",
     "OrderType",
     "Patient",
     "Person",

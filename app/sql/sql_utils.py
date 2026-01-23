@@ -222,6 +222,188 @@ def process_raw_query_results(result) -> List[Dict[str, Any]]:
     return orders
 
 
+def process_drug_order_query_results(result) -> List[Dict[str, Any]]:
+    """
+    Process raw SQL query results for drug orders with prescription and medication details.
+    Includes JSON parsing for dosing_instructions.
+    """
+    import json
+
+    orders = []
+    for row in result:
+        order_dict = {
+            # Order fields
+            "order_id": row.order_id,
+            "order_type_id": row.order_type_id,
+            "concept_id": row.concept_id,
+            "orderer": row.orderer,
+            "encounter_id": row.encounter_id,
+            "instructions": row.instructions,
+            "date_activated": row.date_activated,
+            "auto_expire_date": row.auto_expire_date,
+            "date_stopped": row.date_stopped,
+            "order_reason": row.order_reason,
+            "order_reason_non_coded": row.order_reason_non_coded,
+            "creator": row.creator,
+            "date_created": row.date_created,
+            "voided": row.voided,
+            "voided_by": row.voided_by,
+            "date_voided": row.date_voided,
+            "void_reason": row.void_reason,
+            "patient_id": row.patient_id,
+            "accession_number": row.accession_number,
+            "uuid": row.uuid,
+            "urgency": row.urgency,
+            "order_number": row.order_number,
+            "previous_order_id": row.previous_order_id,
+            "order_action": row.order_action,
+            "comment_to_fulfiller": row.comment_to_fulfiller,
+            "care_setting": row.care_setting,
+            "scheduled_date": row.scheduled_date,
+            "order_group_id": row.order_group_id,
+            "sort_weight": row.sort_weight,
+            "fulfiller_comment": row.fulfiller_comment,
+            "fulfiller_status": row.fulfiller_status,
+            "form_namespace_and_path": row.form_namespace_and_path,
+        }
+
+        # Build enriched orderer info
+        orderer_info = None
+        if row.orderer_person_id:
+            orderer_name_parts = []
+            if row.orderer_prefix:
+                orderer_name_parts.append(row.orderer_prefix)
+            if row.orderer_given_name:
+                orderer_name_parts.append(row.orderer_given_name)
+            if row.orderer_middle_name:
+                orderer_name_parts.append(row.orderer_middle_name)
+            if row.orderer_family_name:
+                orderer_name_parts.append(row.orderer_family_name)
+            if row.orderer_family_name2:
+                orderer_name_parts.append(row.orderer_family_name2)
+            if row.orderer_family_name_suffix:
+                orderer_name_parts.append(row.orderer_family_name_suffix)
+
+            orderer_name = (
+                " ".join(orderer_name_parts)
+                if orderer_name_parts
+                else row.provider_name
+            )
+
+            orderer_info = {
+                "person_id": row.orderer_person_id,
+                "uuid": row.orderer_uuid,
+                "name": orderer_name,
+                "gender": row.orderer_gender,
+                "birthdate": row.orderer_birthdate,
+                "provider_id": row.provider_id,
+                "provider_name": row.provider_name,
+                "provider_identifier": row.provider_identifier,
+                "provider_uuid": row.provider_uuid,
+            }
+
+        # Build enriched patient info
+        patient_info = None
+        if row.patient_person_id:
+            patient_name_parts = []
+            if row.patient_prefix:
+                patient_name_parts.append(row.patient_prefix)
+            if row.patient_given_name:
+                patient_name_parts.append(row.patient_given_name)
+            if row.patient_middle_name:
+                patient_name_parts.append(row.patient_middle_name)
+            if row.patient_family_name:
+                patient_name_parts.append(row.patient_family_name)
+            if row.patient_family_name2:
+                patient_name_parts.append(row.patient_family_name2)
+            if row.patient_family_name_suffix:
+                patient_name_parts.append(row.patient_family_name_suffix)
+
+            patient_name = " ".join(patient_name_parts) if patient_name_parts else None
+
+            patient_info = {
+                "person_id": row.patient_person_id,
+                "uuid": row.patient_uuid,
+                "name": patient_name,
+                "gender": row.patient_gender,
+                "birthdate": row.patient_birthdate,
+            }
+
+        # Build enriched concept info
+        concept_info = None
+        if row.concept_id:
+            concept_info = {
+                "concept_id": row.concept_id,
+                "uuid": row.concept_uuid,
+                "name": row.concept_name,
+                "short_name": row.concept_short_name,
+                "description": row.concept_description,
+                "is_set": row.concept_is_set,
+            }
+
+        # Build drug order info (if present)
+        drug_order_info = None
+        if hasattr(row, "drug_order_id") and row.drug_order_id:
+            # Parse dosing_instructions JSON
+            dosing_instructions = None
+            if row.dosing_instructions:
+                try:
+                    dosing_instructions = json.loads(row.dosing_instructions)
+                except (json.JSONDecodeError, TypeError):
+                    dosing_instructions = {"instructions": row.dosing_instructions}
+
+            # Build drug info (if present)
+            drug_info = None
+            if row.drug_id:
+                drug_info = {
+                    "drug_id": row.drug_id,
+                    "concept_id": row.drug_concept_id,
+                    "name": row.drug_name,
+                    "uuid": row.drug_uuid,
+                    "combination": row.drug_combination,
+                    "strength": row.drug_strength,
+                    "dosage_form": row.drug_dosage_form,
+                    "route": row.drug_route,
+                }
+
+            drug_order_info = {
+                "order_id": row.drug_order_id,
+                "drug_inventory_id": row.drug_inventory_id,
+                "dose": row.dose,
+                "as_needed": row.as_needed,
+                "dosing_type": row.dosing_type,
+                "quantity": row.quantity,
+                "as_needed_condition": row.as_needed_condition,
+                "num_refills": row.num_refills,
+                "dosing_instructions": dosing_instructions,
+                "duration": row.duration,
+                "duration_units": row.duration_units,
+                "duration_units_name": row.duration_units_name,
+                "quantity_units": row.quantity_units,
+                "quantity_units_name": row.quantity_units_name,
+                "route": row.drug_order_route,
+                "route_name": row.route_name,
+                "dose_units": row.dose_units,
+                "dose_units_name": row.dose_units_name,
+                "frequency": row.frequency,
+                "frequency_name": row.frequency_name,
+                "brand_name": row.brand_name,
+                "dispense_as_written": row.dispense_as_written,
+                "drug_non_coded": row.drug_non_coded,
+                "drug_info": drug_info,
+            }
+
+        # Add enriched information to order
+        order_dict["orderer_info"] = orderer_info
+        order_dict["patient_info"] = patient_info
+        order_dict["concept_info"] = concept_info
+        order_dict["drug_order_info"] = drug_order_info
+
+        orders.append(order_dict)
+
+    return orders
+
+
 def process_expanded_order_results(result) -> Dict[str, Any]:
     """
     Process raw SQL query results for a single order with expansion into structured format.

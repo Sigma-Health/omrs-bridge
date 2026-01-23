@@ -791,9 +791,15 @@ class OrdersCRUD(BaseCRUD[Order]):
     ) -> List[Dict[str, Any]]:
         """
         Get orders by order type and visit UUID using raw SQL query.
+        For drug orders (order_type_id=2), includes prescription and medication details.
         """
-        # Get the reusable SQL query
-        raw_sql = get_orders_with_enrichment_sql()
+        from app.sql.orders_sql import get_drug_orders_with_enrichment_sql
+
+        # Use drug-specific query for order_type_id=2 (drug/prescription orders)
+        if order_type_id == 2:
+            raw_sql = get_drug_orders_with_enrichment_sql()
+        else:
+            raw_sql = get_orders_with_enrichment_sql()
 
         # Define WHERE conditions
         where_conditions = {
@@ -811,7 +817,13 @@ class OrdersCRUD(BaseCRUD[Order]):
             limit,
         )
 
-        return process_raw_query_results(result)
+        # Process results with drug order support
+        if order_type_id == 2:
+            from app.sql.sql_utils import process_drug_order_query_results
+
+            return process_drug_order_query_results(result)
+        else:
+            return process_raw_query_results(result)
 
     # Old method definitions removed - now using app/sql modules
     # All SQL utilities moved to app/sql/sql_utils.py
