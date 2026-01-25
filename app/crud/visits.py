@@ -302,6 +302,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
         patient_id: Optional[int] = None,
         location_id: Optional[int] = None,
         days: Optional[int] = None,
+        free_text: Optional[str] = None,
         skip: int = 0,
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
@@ -317,6 +318,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
             patient_id: Optional patient ID to filter by
             location_id: Optional location ID to filter by
             days: Optional number of days to look back from today (e.g., 1 for today)
+            free_text: Optional free-text search in patient names and visit details
             skip: Number of records to skip
             limit: Maximum number of records to return
 
@@ -325,6 +327,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
         """
         from app.models import Order, Encounter, Person, PersonName
         from sqlalchemy.orm import aliased
+        from sqlalchemy import func
 
         # Create aliases for Person and PersonName tables
         PatientPerson = aliased(Person)
@@ -402,6 +405,29 @@ class VisitsCRUD(BaseCRUD[Visit]):
         # Apply location filter if provided
         if location_id:
             query = query.filter(self.model.location_id == location_id)
+
+        # Apply free-text search filter if provided
+        if free_text:
+            from sqlalchemy import or_, cast, String
+
+            search_term = f"%{free_text.lower()}%"
+
+            # Search in patient names (given, family, middle, prefix)
+            patient_name_filters = [
+                func.lower(PatientPersonName.given_name).like(search_term),
+                func.lower(PatientPersonName.family_name).like(search_term),
+                func.lower(PatientPersonName.middle_name).like(search_term),
+                func.lower(PatientPersonName.prefix).like(search_term),
+            ]
+
+            # Search in visit details (UUID, indication concept if available)
+            visit_filters = [
+                func.lower(cast(self.model.uuid, String)).like(search_term),
+            ]
+
+            # Combine all search filters with OR
+            search_conditions = patient_name_filters + visit_filters
+            query = query.filter(or_(*search_conditions))
 
         results = (
             query.order_by(self.model.date_started.desc())

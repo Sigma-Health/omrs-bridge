@@ -306,6 +306,10 @@ async def get_visits_with_order_type_enriched(
         ge=1,
         description="Number of days to look back from today (e.g., 1 for today, 2 for today and yesterday)",
     ),
+    free_text: Optional[str] = Query(
+        None,
+        description="Free-text search in patient names and visit details",
+    ),
     skip: int = Query(
         0,
         ge=0,
@@ -323,7 +327,7 @@ async def get_visits_with_order_type_enriched(
     """
     Get visits that have orders of a particular order type.
     This endpoint returns visits with patient details (name, gender, birthdate)
-    You can filter by date range, patient ID, location ID, or number of days.
+    You can filter by date range, patient ID, location ID, number of days, or free-text search.
     """
     return visits.get_visits_with_order_type_and_patient_info(
         db,
@@ -333,6 +337,7 @@ async def get_visits_with_order_type_enriched(
         patient_id=patient_id,
         location_id=location_id,
         days=days,
+        free_text=free_text,
         skip=skip,
         limit=limit,
     )
