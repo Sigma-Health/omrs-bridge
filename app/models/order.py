@@ -9,8 +9,10 @@ from sqlalchemy import (
     DateTime,
     Boolean,
     Text,
+    ForeignKey,
 )
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
@@ -19,7 +21,7 @@ class Order(Base):
 
     order_id = Column(Integer, primary_key=True, index=True)
     order_type_id = Column(Integer)
-    concept_id = Column(Integer)
+    concept_id = Column(Integer, ForeignKey("concept.concept_id"))
     orderer = Column(Integer)
     encounter_id = Column(Integer)
     instructions = Column(Text, nullable=True)
@@ -49,3 +51,6 @@ class Order(Base):
     fulfiller_comment = Column(Text, nullable=True)
     fulfiller_status = Column(String(50), nullable=True)
     form_namespace_and_path = Column(Text, nullable=True)
+
+    # Relationship to Concept
+    concept = relationship("Concept", back_populates="orders")

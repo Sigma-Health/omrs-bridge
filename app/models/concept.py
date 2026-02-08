@@ -132,6 +132,8 @@ class Concept(Base):
         order_by="ConceptName.locale_preferred.desc(), ConceptName.concept_name_id",
     )
 
+    orders = relationship("Order", back_populates="concept")
+
     @property
     def preferred_name(self):
         """Return the preferred (locale_preferred) concept name if available."""

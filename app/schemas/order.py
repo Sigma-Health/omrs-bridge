@@ -104,6 +104,8 @@ class OrderResponse(OrderBase):
     creator: int
     date_created: datetime
     uuid: str
+    concept_name: Optional[str] = None
+    concept_uuid: Optional[str] = None
     creator_info: Optional[PersonInfo] = None
     patient_info: Optional[PersonInfo] = None
     orderer_info: Optional[OrdererInfo] = None
