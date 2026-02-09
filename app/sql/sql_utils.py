@@ -390,6 +390,7 @@ def process_drug_order_query_results(result) -> List[Dict[str, Any]]:
                 "brand_name": row.brand_name,
                 "dispense_as_written": row.dispense_as_written,
                 "drug_non_coded": row.drug_non_coded,
+                "drug_name": row.drug_name,
                 "drug_info": drug_info,
             }
 

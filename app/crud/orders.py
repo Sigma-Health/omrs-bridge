@@ -733,6 +733,7 @@ class OrdersCRUD(BaseCRUD[Order]):
             Concept,
             ConceptName,
             DrugOrder,
+            Drug,
         )
 
         # Create aliases for Person and PersonName tables to join them multiple times
@@ -744,6 +745,8 @@ class OrdersCRUD(BaseCRUD[Order]):
         CreatorPersonName = aliased(PersonName)
         # Create alias for SHORT concept name
         ShortConceptName = aliased(ConceptName)
+        # Create alias for route concept name
+        RouteConceptName = aliased(ConceptName)
 
         try:
             # First, let's check if the visit exists
@@ -829,6 +832,10 @@ class OrdersCRUD(BaseCRUD[Order]):
                     DrugOrder.duration.label("drug_duration"),
                     DrugOrder.duration_units.label("drug_duration_units"),
                     DrugOrder.num_refills.label("drug_num_refills"),
+                    # Drug information
+                    Drug.name.label("drug_name"),
+                    # Route concept name
+                    RouteConceptName.name.label("route_name"),
                 )
                 .join(Encounter, Order.encounter_id == Encounter.encounter_id)
                 .join(Visit, Encounter.visit_id == Visit.visit_id)
@@ -918,6 +925,24 @@ class OrdersCRUD(BaseCRUD[Order]):
                 )
                 # Join for drug order information (only for drug orders)
                 .outerjoin(DrugOrder, DrugOrder.order_id == Order.order_id)
+                # Join for drug information
+                .outerjoin(
+                    Drug,
+                    and_(
+                        Drug.drug_id == DrugOrder.drug_inventory_id,
+                        Drug.retired == False,  # noqa: E712
+                    ),
+                )
+                # Join for route concept name
+                .outerjoin(
+                    RouteConceptName,
+                    and_(
+                        RouteConceptName.concept_id == DrugOrder.route,
+                        RouteConceptName.locale == "en",
+                        RouteConceptName.concept_name_type == "FULLY_SPECIFIED",
+                        RouteConceptName.voided == False,  # noqa: E712
+                    ),
+                )
                 .filter(and_(Visit.uuid == visit_uuid, Order.voided == False))  # noqa: E712
                 .offset(skip)
                 .limit(limit)
@@ -1088,6 +1113,8 @@ class OrdersCRUD(BaseCRUD[Order]):
                         "duration": row.drug_duration,
                         "duration_units": row.drug_duration_units,
                         "num_refills": row.drug_num_refills,
+                        "drug_name": row.drug_name,
+                        "route_name": row.route_name,
                     }
                     if order.order_type_id == 2 and row.drug_dose is not None
                     else None,

@@ -56,6 +56,7 @@ def test_get_order_enriched():
         # Check that the response includes the enriched fields
         assert "creator_info" in data
         assert "patient_info" in data
+        assert "drug_order_info" in data
 
         # Check creator_info structure
         if data["creator_info"]:
@@ -68,6 +69,21 @@ def test_get_order_enriched():
             assert "person_id" in data["patient_info"]
             assert "uuid" in data["patient_info"]
             assert "name" in data["patient_info"]
+
+        # Check drug_order_info structure (for drug orders)
+        if data["drug_order_info"]:
+            # Check that drug_name and route_name are included
+            assert "drug_name" in data["drug_order_info"], (
+                "drug_name should be included in drug_order_info"
+            )
+            assert "route_name" in data["drug_order_info"], (
+                "route_name should be included in drug_order_info"
+            )
+
+            # Verify they're not None (if the order has drug information)
+            if data["order_type_id"] == 2:  # Drug order type
+                print(f"drug_order_info: {data['drug_order_info']}")
+                # These might be None if no drug/route is set, but the fields should exist
 
 
 def test_get_order_enriched_not_found():
