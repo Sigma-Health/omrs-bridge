@@ -5,6 +5,7 @@ CRUD operations for vitals/observations queries.
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from app.config import get_vital_signs_concept_ids
 from app.sql.vitals_sql import (
     get_vitals_by_visit_sql,
     get_vitals_by_visit_uuid_sql,
@@ -54,43 +55,35 @@ class VitalsCRUD:
         Returns:
             VisitVitals with visit info and vitals
         """
-        # Try comprehensive query first (looks for any numeric observations)
-        sql_comprehensive = get_vitals_comprehensive_by_visit_sql()
+        concept_ids = get_vital_signs_concept_ids()
         params = {"visit_id": visit_id, "skip": skip, "limit": limit}
 
-        result = db.execute(text(sql_comprehensive), params)
+        result = db.execute(
+            text(get_vitals_comprehensive_by_visit_sql(concept_ids)), params
+        )
         vitals = self._process_vitals_results(result)
 
-        # If no vitals found with the comprehensive query, try the targeted query
         if not vitals:
-            sql_targeted = get_vitals_targeted_by_visit_sql()
-            result = db.execute(text(sql_targeted), params)
+            result = db.execute(
+                text(get_vitals_targeted_by_visit_sql(concept_ids)), params
+            )
             vitals = self._process_vitals_results(result)
 
-        # If no vitals found with the targeted query, try the main query
         if not vitals:
-            sql = get_vitals_by_visit_sql()
-            result = db.execute(text(sql), params)
+            result = db.execute(text(get_vitals_by_visit_sql(concept_ids)), params)
             vitals = self._process_vitals_results(result)
 
-        # If still no vitals found, try the simplified approach
         if not vitals:
-            sql_simple = get_vitals_simple_by_visit_sql()
-            result_simple = db.execute(text(sql_simple), params)
-            vitals = self._process_vitals_results(result_simple)
+            result = db.execute(
+                text(get_vitals_simple_by_visit_sql(concept_ids)), params
+            )
+            vitals = self._process_vitals_results(result)
 
-        # Get visit and patient info from first vital if available
-        visit_info = None
         patient_info = None
         encounter_info = None
 
         if vitals:
             first_vital = vitals[0]
-            # Extract visit info from the first vital's encounter
-            visit_info = {
-                "visit_id": visit_id,
-                "visit_uuid": getattr(first_vital, "visit_uuid", ""),
-            }
             patient_info = PatientVitalsInfo(
                 patient_id=getattr(first_vital, "patient_id", 0),
                 uuid=getattr(first_vital, "patient_uuid", ""),
@@ -102,28 +95,32 @@ class VitalsCRUD:
                 encounter_datetime=getattr(first_vital, "encounter_datetime", None),
             )
 
-        # Get total count - try comprehensive approach first
-        count_sql_comprehensive = get_vitals_comprehensive_count_by_visit_sql()
-        count_result = db.execute(text(count_sql_comprehensive), {"visit_id": visit_id})
+        count_result = db.execute(
+            text(get_vitals_comprehensive_count_by_visit_sql(concept_ids)),
+            {"visit_id": visit_id},
+        )
         total_count = count_result.scalar()
-        
-        # If count is 0, try the targeted count query
+
         if total_count == 0:
-            count_sql_targeted = get_vitals_targeted_count_by_visit_sql()
-            count_result = db.execute(text(count_sql_targeted), {"visit_id": visit_id})
+            count_result = db.execute(
+                text(get_vitals_targeted_count_by_visit_sql(concept_ids)),
+                {"visit_id": visit_id},
+            )
             total_count = count_result.scalar()
-        
-        # If count is 0, try the main count query
+
         if total_count == 0:
-            count_sql = get_vitals_count_by_visit_sql()
-            count_result = db.execute(text(count_sql), {"visit_id": visit_id})
+            count_result = db.execute(
+                text(get_vitals_count_by_visit_sql(concept_ids)),
+                {"visit_id": visit_id},
+            )
             total_count = count_result.scalar()
-        
-        # If still 0, try the simplified count query
+
         if total_count == 0:
-            count_sql_simple = get_vitals_simple_count_by_visit_sql()
-            count_result_simple = db.execute(text(count_sql_simple), {"visit_id": visit_id})
-            total_count = count_result_simple.scalar()
+            count_result = db.execute(
+                text(get_vitals_simple_count_by_visit_sql(concept_ids)),
+                {"visit_id": visit_id},
+            )
+            total_count = count_result.scalar()
 
         return VisitVitals(
             visit_id=visit_id,
@@ -187,10 +184,10 @@ class VitalsCRUD:
         Returns:
             VitalsGroupedResponse with vitals grouped by type
         """
-        sql = get_vitals_grouped_by_type_sql()
+        concept_ids = get_vital_signs_concept_ids()
         params = {"visit_id": visit_id, "skip": skip, "limit": limit}
 
-        result = db.execute(text(sql), params)
+        result = db.execute(text(get_vitals_grouped_by_type_sql(concept_ids)), params)
         vitals = self._process_vitals_results(result)
 
         # Group vitals by concept name
@@ -229,9 +226,9 @@ class VitalsCRUD:
                 encounter_datetime=first_vital.obs_datetime,
             )
 
-        # Get total count
-        count_sql = get_vitals_count_by_visit_sql()
-        count_result = db.execute(text(count_sql), {"visit_id": visit_id})
+        count_result = db.execute(
+            text(get_vitals_count_by_visit_sql(concept_ids)), {"visit_id": visit_id}
+        )
         total_count = count_result.scalar()
 
         return VitalsGroupedResponse(

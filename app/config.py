@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # Default OpenMRS user ID to attribute new records to when not provided
     default_creator_id: int = 1
 
+    # Vital signs concept IDs (comma-separated)
+    vital_signs_concept_ids: str = ""
+    vital_signs_body_position_concept_id: str = ""
+
     # OpenMRS REST configuration for post-processing (e.g., search index updates)
     openmrs_base_url: str = "http://localhost:8080/openmrs"
     openmrs_rest_username: str | None = None
@@ -48,6 +52,27 @@ def get_valid_api_keys() -> list[str]:
     if not settings.api_keys:
         return []
     return [key.strip() for key in settings.api_keys.split(",") if key.strip()]
+
+
+# Vital signs concept ID helpers
+def get_vital_signs_concept_ids() -> list[int]:
+    """Parse comma-separated vital sign concept IDs from environment variable"""
+    ids = []
+    for part in settings.vital_signs_concept_ids.split(","):
+        part = part.strip()
+        if part:
+            try:
+                ids.append(int(part))
+            except ValueError:
+                pass
+    if settings.vital_signs_body_position_concept_id.strip():
+        try:
+            body_pos_id = int(settings.vital_signs_body_position_concept_id.strip())
+            if body_pos_id not in ids:
+                ids.append(body_pos_id)
+        except ValueError:
+            pass
+    return ids
 
 
 # Database URL
