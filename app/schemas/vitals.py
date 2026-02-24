@@ -32,6 +32,8 @@ class VitalSign(BaseModel):
     encounter_uuid: Optional[str] = None
     encounter_datetime: Optional[datetime] = None
     visit_uuid: Optional[str] = None
+    creator_id: Optional[int] = None
+    creator_name: Optional[str] = None
 
 
 class PatientVitalsInfo(BaseModel):

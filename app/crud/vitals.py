@@ -298,6 +298,8 @@ class VitalsCRUD:
                 encounter_uuid=getattr(row, "encounter_uuid", ""),
                 encounter_datetime=getattr(row, "encounter_datetime", None),
                 visit_uuid=getattr(row, "visit_uuid", ""),
+                creator_id=getattr(row, "creator_id", None),
+                creator_name=getattr(row, "creator_name", None),
             )
 
             vitals.append(vital)

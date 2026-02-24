@@ -64,7 +64,11 @@ def get_vitals_by_visit_sql(concept_ids: List[int]) -> str:
         cvn.name AS value_coded_name,
         
         -- Concept class for filtering vital signs
-        cc.name AS concept_class_name
+        cc.name AS concept_class_name,
+
+        -- Creator information
+        o.creator AS creator_id,
+        CONCAT_WS(' ', creator_pn.given_name, creator_pn.family_name) AS creator_name
 
     FROM obs o
     
@@ -98,6 +102,12 @@ def get_vitals_by_visit_sql(concept_ids: List[int]) -> str:
         AND cvn.locale = 'en'
         AND cvn.concept_name_type = 'FULLY_SPECIFIED'
         AND cvn.voided = 0
+
+    -- Left join with creator name
+    LEFT JOIN users u ON o.creator = u.user_id
+    LEFT JOIN person_name creator_pn ON u.person_id = creator_pn.person_id
+        AND creator_pn.preferred = 1
+        AND creator_pn.voided = 0
 
     WHERE o.voided = 0
         AND v.visit_id = :visit_id
@@ -167,7 +177,11 @@ def get_vitals_by_visit_uuid_sql(concept_ids: List[int]) -> str:
         cvn.name AS value_coded_name,
         
         -- Concept class for filtering vital signs
-        cc.name AS concept_class_name
+        cc.name AS concept_class_name,
+
+        -- Creator information
+        o.creator AS creator_id,
+        CONCAT_WS(' ', creator_pn.given_name, creator_pn.family_name) AS creator_name
 
     FROM obs o
     
@@ -201,6 +215,12 @@ def get_vitals_by_visit_uuid_sql(concept_ids: List[int]) -> str:
         AND cvn.locale = 'en'
         AND cvn.concept_name_type = 'FULLY_SPECIFIED'
         AND cvn.voided = 0
+
+    -- Left join with creator name
+    LEFT JOIN users u ON o.creator = u.user_id
+    LEFT JOIN person_name creator_pn ON u.person_id = creator_pn.person_id
+        AND creator_pn.preferred = 1
+        AND creator_pn.voided = 0
 
     WHERE o.voided = 0
         AND v.uuid = :visit_uuid
@@ -288,7 +308,11 @@ def get_vitals_grouped_by_type_sql(concept_ids: List[int]) -> str:
         cvn.name AS value_coded_name,
         
         -- Concept class for filtering vital signs
-        cc.name AS concept_class_name
+        cc.name AS concept_class_name,
+
+        -- Creator information
+        o.creator AS creator_id,
+        CONCAT_WS(' ', creator_pn.given_name, creator_pn.family_name) AS creator_name
 
     FROM obs o
     
@@ -322,6 +346,12 @@ def get_vitals_grouped_by_type_sql(concept_ids: List[int]) -> str:
         AND cvn.locale = 'en'
         AND cvn.concept_name_type = 'FULLY_SPECIFIED'
         AND cvn.voided = 0
+
+    -- Left join with creator name
+    LEFT JOIN users u ON o.creator = u.user_id
+    LEFT JOIN person_name creator_pn ON u.person_id = creator_pn.person_id
+        AND creator_pn.preferred = 1
+        AND creator_pn.voided = 0
 
     WHERE o.voided = 0
         AND v.visit_id = :visit_id
