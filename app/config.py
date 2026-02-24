@@ -2,6 +2,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+_ENV_FILE_STR = str(_ENV_FILE) if _ENV_FILE.exists() else None
 
 
 class Settings(BaseSettings):
@@ -40,7 +41,7 @@ class Settings(BaseSettings):
     openmrs_rest_verify_ssl: bool = True
 
     class Config:
-        env_file = str(_ENV_FILE)
+        env_file = _ENV_FILE_STR
         case_sensitive = False
         extra = "ignore"
 

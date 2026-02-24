@@ -17,6 +17,10 @@ services:
       - API_KEYS=${API_KEYS:-}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this-in-production}
       
+      # Vital signs concept IDs
+      - VITAL_SIGNS_CONCEPT_IDS=${VITAL_SIGNS_CONCEPT_IDS:-}
+      - VITAL_SIGNS_BODY_POSITION_CONCEPT_ID=${VITAL_SIGNS_BODY_POSITION_CONCEPT_ID:-}
+
       # Application settings
       - PORT=1221
       - HOST=0.0.0.0

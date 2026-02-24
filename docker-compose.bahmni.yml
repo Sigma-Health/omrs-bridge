@@ -16,6 +16,10 @@ services:
       # API configuration
       - API_KEYS=${API_KEYS:-omrs_abc123def456ghi789,omrs_xyz789uvw456rst123}
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this-in-production}
+
+      # Vital signs concept IDs
+      - VITAL_SIGNS_CONCEPT_IDS=${VITAL_SIGNS_CONCEPT_IDS:-}
+      - VITAL_SIGNS_BODY_POSITION_CONCEPT_ID=${VITAL_SIGNS_BODY_POSITION_CONCEPT_ID:-}
       
       # Application settings
       - PORT=1221
