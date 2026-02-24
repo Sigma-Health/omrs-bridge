@@ -226,11 +226,15 @@ async def get_concepts_by_class(
         None,
         description="Locale code to filter concept names",
     ),
+    search: Optional[str] = Query(
+        None,
+        description="Search term to filter by preferred name (case-insensitive, partial match)",
+    ),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
     """
-    Get concepts by class
+    Get concepts by class, optionally filtered by preferred name search term
     """
     return concepts.get_concepts_by_class(
         db,
@@ -238,6 +242,7 @@ async def get_concepts_by_class(
         skip=skip,
         limit=limit,
         locale=locale,
+        search=search,
     )
 
 

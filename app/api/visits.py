@@ -1,5 +1,6 @@
 from typing import List, Optional
 
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -7,11 +8,16 @@ from fastapi import (
     Query,
     Path,
 )
+
 from sqlalchemy.orm import Session
 
+
 from app.database import get_db
+
 from app.auth import get_current_api_key
+
 from app.crud import visits
+
 from app.schemas import (
     VisitCreate,
     VisitUpdate,
@@ -19,7 +25,9 @@ from app.schemas import (
     VisitResponse,
     VisitUpdateResponse,
 )
+
 from app.utils import validate_uuid
+
 
 router = APIRouter(tags=["visits"])
 
@@ -31,10 +39,14 @@ async def create_visit(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Create a new visit
+
     """
+
     try:
         return visits.create(db, visit_create)
+
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -59,8 +71,11 @@ async def list_visits(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     List visits with pagination
+
     """
+
     return visits.list(db, skip=skip, limit=limit)
 
 
@@ -85,8 +100,11 @@ async def list_active_visits(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     List active visits (not voided and not stopped)
+
     """
+
     return visits.get_active_visits(
         db,
         patient_id=patient_id,
@@ -116,8 +134,11 @@ async def list_completed_visits(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     List completed visits (not voided and with date_stopped)
+
     """
+
     return visits.get_completed_visits(
         db,
         patient_id=patient_id,
@@ -147,8 +168,11 @@ async def list_voided_visits(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     List voided visits
+
     """
+
     return visits.get_voided_visits(
         db,
         patient_id=patient_id,
@@ -175,8 +199,11 @@ async def get_visits_by_patient(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Get all visits for a specific patient
+
     """
+
     return visits.get_by_patient(
         db,
         patient_id=patient_id,
@@ -203,8 +230,11 @@ async def get_visits_by_type(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Get visits by visit type
+
     """
+
     return visits.get_by_visit_type(
         db,
         visit_type_id=visit_type_id,
@@ -231,8 +261,11 @@ async def get_visits_by_location(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Get visits by location
+
     """
+
     return visits.get_by_location(
         db,
         location_id=location_id,
@@ -270,8 +303,11 @@ async def get_visits_by_date_range(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Get visits within a date range
+
     """
+
     return visits.get_by_date_range(
         db,
         start_date=start_date,
@@ -325,10 +361,15 @@ async def get_visits_with_order_type_enriched(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Get visits that have orders of a particular order type.
+
     This endpoint returns visits with patient details (name, gender, birthdate)
+
     You can filter by date range, patient ID, location ID, number of days, or free-text search.
+
     """
+
     return visits.get_visits_with_order_type_and_patient_info(
         db,
         order_type_id=order_type_id,
@@ -350,14 +391,19 @@ async def get_visit(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Get visit by ID
+
     """
+
     visit = visits.get(db, visit_id)
+
     if not visit:
         raise HTTPException(
             status_code=404,
             detail="Visit not found",
         )
+
     return visit
 
 
@@ -368,8 +414,11 @@ async def get_visit_by_uuid(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Get visit by UUID
+
     """
+
     if not validate_uuid(uuid):
         raise HTTPException(
             status_code=400,
@@ -377,11 +426,13 @@ async def get_visit_by_uuid(
         )
 
     visit = visits.get_by_uuid(db, uuid)
+
     if not visit:
         raise HTTPException(
             status_code=404,
             detail="Visit not found",
         )
+
     return visit
 
 
@@ -396,14 +447,18 @@ async def update_visit_partial(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Update visit partially (PATCH)
+
     """
+
     try:
         updated_visit = visits.update_partial(
             db,
             visit_id,
             visit_update,
         )
+
         if not updated_visit:
             raise HTTPException(
                 status_code=404,
@@ -411,7 +466,9 @@ async def update_visit_partial(
             )
 
         # Get updated fields for response
+
         original_visit = visits.get(db, visit_id)
+
         updated_fields = visits.get_updated_fields(
             original_visit,
             updated_visit,
@@ -424,6 +481,7 @@ async def update_visit_partial(
             updated_fields=updated_fields,
             visit=updated_visit,
         )
+
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -442,8 +500,11 @@ async def update_visit_partial_by_uuid(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Update visit partially by UUID (PATCH)
+
     """
+
     if not validate_uuid(uuid):
         raise HTTPException(
             status_code=400,
@@ -456,6 +517,7 @@ async def update_visit_partial_by_uuid(
             uuid,
             visit_update,
         )
+
         if not updated_visit:
             raise HTTPException(
                 status_code=404,
@@ -463,7 +525,9 @@ async def update_visit_partial_by_uuid(
             )
 
         # Get updated fields for response
+
         original_visit = visits.get_by_uuid(db, uuid)
+
         updated_fields = visits.get_updated_fields(
             original_visit,
             updated_visit,
@@ -476,6 +540,7 @@ async def update_visit_partial_by_uuid(
             updated_fields=updated_fields,
             visit=updated_visit,
         )
+
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -494,14 +559,18 @@ async def update_visit_full(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Update visit completely (PUT)
+
     """
+
     try:
         updated_visit = visits.update_full(
             db,
             visit_id,
             visit_replace,
         )
+
         if not updated_visit:
             raise HTTPException(
                 status_code=404,
@@ -509,7 +578,9 @@ async def update_visit_full(
             )
 
         # Get updated fields for response
+
         original_visit = visits.get(db, visit_id)
+
         updated_fields = visits.get_updated_fields(
             original_visit,
             updated_visit,
@@ -522,6 +593,7 @@ async def update_visit_full(
             updated_fields=updated_fields,
             visit=updated_visit,
         )
+
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -540,8 +612,11 @@ async def update_visit_full_by_uuid(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Update visit completely by UUID (PUT)
+
     """
+
     if not validate_uuid(uuid):
         raise HTTPException(
             status_code=400,
@@ -554,6 +629,7 @@ async def update_visit_full_by_uuid(
             uuid,
             visit_replace,
         )
+
         if not updated_visit:
             raise HTTPException(
                 status_code=404,
@@ -561,7 +637,9 @@ async def update_visit_full_by_uuid(
             )
 
         # Get updated fields for response
+
         original_visit = visits.get_by_uuid(db, uuid)
+
         updated_fields = visits.get_updated_fields(
             original_visit,
             updated_visit,
@@ -574,6 +652,7 @@ async def update_visit_full_by_uuid(
             updated_fields=updated_fields,
             visit=updated_visit,
         )
+
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -596,8 +675,11 @@ async def stop_visit(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Stop a visit by setting the date_stopped field
+
     """
+
     try:
         stopped_visit = visits.stop_visit(
             db,
@@ -605,9 +687,12 @@ async def stop_visit(
             stopped_by,
             date_stopped,
         )
+
         if not stopped_visit:
             raise HTTPException(status_code=404, detail="Visit not found")
+
         return stopped_visit
+
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -630,8 +715,11 @@ async def void_visit(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Void a visit
+
     """
+
     try:
         voided_visit = visits.void_visit(
             db,
@@ -639,9 +727,12 @@ async def void_visit(
             voided_by,
             void_reason,
         )
+
         if not voided_visit:
             raise HTTPException(status_code=404, detail="Visit not found")
+
         return voided_visit
+
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -660,17 +751,23 @@ async def unvoid_visit(
     api_key: str = Depends(get_current_api_key),
 ):
     """
+
     Unvoid a visit
+
     """
+
     try:
         unvoided_visit = visits.unvoid_visit(
             db,
             visit_id,
             unvoided_by,
         )
+
         if not unvoided_visit:
             raise HTTPException(status_code=404, detail="Visit not found")
+
         return unvoided_visit
+
     except Exception as e:
         raise HTTPException(
             status_code=400,

@@ -171,6 +171,7 @@ class ConceptsCRUD(BaseCRUD[Concept]):
         skip: int = 0,
         limit: int = 100,
         locale: Optional[str] = None,
+        search: Optional[str] = None,
     ) -> List[Concept]:
         """
         Get concepts for a specific class.
@@ -180,6 +181,8 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             class_identifier: ID or name of the concept class
             skip: Number of records to skip
             limit: Maximum number of records to return
+            locale: Optional locale to filter concept names
+            search: Optional search term matched against preferred_name (ConceptName)
 
         Returns:
             List of concepts with the specified class
@@ -197,6 +200,17 @@ class ConceptsCRUD(BaseCRUD[Concept]):
                 ConceptClass.concept_class_id == Concept.class_id,
             )
             filters.append(func.lower(ConceptClass.name) == class_identifier.lower())
+
+        if search:
+            query = query.join(
+                ConceptName,
+                and_(
+                    ConceptName.concept_id == Concept.concept_id,
+                    ConceptName.locale_preferred.is_(True),
+                    ConceptName.voided.is_(False),
+                ),
+            )
+            filters.append(ConceptName.name.ilike(f"%{search}%"))
 
         return query.filter(and_(*filters)).offset(skip).limit(limit).all()
 

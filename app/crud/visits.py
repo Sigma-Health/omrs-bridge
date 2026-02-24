@@ -1,44 +1,71 @@
 """
+
 Visit-specific CRUD operations.
+
 Extends BaseCRUD with visit-specific functionality.
+
 """
 
 from typing import Optional, List, Dict, Any
+
 from sqlalchemy.orm import Session
+
 from sqlalchemy import and_
 
+
 from .base import BaseCRUD
+
 from app.models import Visit
 
 
 class VisitsCRUD(BaseCRUD[Visit]):
     """
+
     CRUD operations for Visit model.
 
+
+
     Provides visit-specific database operations including:
+
     - Basic CRUD operations (inherited from BaseCRUD)
+
     - Visit-specific queries (by patient, visit type, date range, etc.)
+
     - Visit status management (active, completed, voided)
+
     """
 
     def __init__(self):
+
         super().__init__(Visit)
 
     def get_by_patient(
         self, db: Session, patient_id: int, skip: int = 0, limit: int = 100
     ) -> List[Visit]:
         """
+
         Get all visits for a specific patient.
 
+
+
         Args:
+
             db: Database session
+
             patient_id: Patient ID
+
             skip: Number of records to skip
+
             limit: Maximum number of records to return
 
+
+
         Returns:
+
             List of visits for the patient
+
         """
+
         return (
             db.query(self.model)
             .filter(self.model.patient_id == patient_id)
@@ -56,17 +83,29 @@ class VisitsCRUD(BaseCRUD[Visit]):
         limit: int = 100,
     ) -> List[Visit]:
         """
+
         Get active visits (not voided and not stopped).
 
+
+
         Args:
+
             db: Database session
+
             patient_id: Optional patient ID to filter by
+
             skip: Number of records to skip
+
             limit: Maximum number of records to return
 
+
+
         Returns:
+
             List of active visits
+
         """
+
         query = db.query(self.model).filter(
             and_(self.model.voided == False, self.model.date_stopped.is_(None))  # noqa: E712
         )
@@ -89,17 +128,29 @@ class VisitsCRUD(BaseCRUD[Visit]):
         limit: int = 100,
     ) -> List[Visit]:
         """
+
         Get completed visits (not voided and with date_stopped).
 
+
+
         Args:
+
             db: Database session
+
             patient_id: Optional patient ID to filter by
+
             skip: Number of records to skip
+
             limit: Maximum number of records to return
 
+
+
         Returns:
+
             List of completed visits
+
         """
+
         query = db.query(self.model).filter(
             and_(self.model.voided == False, self.model.date_stopped.isnot(None))  # noqa: E712
         )
@@ -122,17 +173,29 @@ class VisitsCRUD(BaseCRUD[Visit]):
         limit: int = 100,
     ) -> List[Visit]:
         """
+
         Get voided visits.
 
+
+
         Args:
+
             db: Database session
+
             patient_id: Optional patient ID to filter by
+
             skip: Number of records to skip
+
             limit: Maximum number of records to return
 
+
+
         Returns:
+
             List of voided visits
+
         """
+
         query = db.query(self.model).filter(self.model.voided == True)  # noqa: E712
 
         if patient_id:
@@ -149,17 +212,29 @@ class VisitsCRUD(BaseCRUD[Visit]):
         self, db: Session, visit_type_id: int, skip: int = 0, limit: int = 100
     ) -> List[Visit]:
         """
+
         Get visits by visit type.
 
+
+
         Args:
+
             db: Database session
+
             visit_type_id: Visit type ID
+
             skip: Number of records to skip
+
             limit: Maximum number of records to return
 
+
+
         Returns:
+
             List of visits of the specified type
+
         """
+
         return (
             db.query(self.model)
             .filter(self.model.visit_type_id == visit_type_id)
@@ -173,17 +248,29 @@ class VisitsCRUD(BaseCRUD[Visit]):
         self, db: Session, location_id: int, skip: int = 0, limit: int = 100
     ) -> List[Visit]:
         """
+
         Get visits by location.
 
+
+
         Args:
+
             db: Database session
+
             location_id: Location ID
+
             skip: Number of records to skip
+
             limit: Maximum number of records to return
 
+
+
         Returns:
+
             List of visits at the specified location
+
         """
+
         return (
             db.query(self.model)
             .filter(self.model.location_id == location_id)
@@ -203,19 +290,33 @@ class VisitsCRUD(BaseCRUD[Visit]):
         limit: int = 100,
     ) -> List[Visit]:
         """
+
         Get visits within a date range.
 
+
+
         Args:
+
             db: Database session
+
             start_date: Start date (YYYY-MM-DD format)
+
             end_date: End date (YYYY-MM-DD format)
+
             patient_id: Optional patient ID to filter by
+
             skip: Number of records to skip
+
             limit: Maximum number of records to return
 
+
+
         Returns:
+
             List of visits within the date range
+
         """
+
         query = db.query(self.model).filter(
             and_(
                 self.model.date_started >= start_date,
@@ -244,24 +345,41 @@ class VisitsCRUD(BaseCRUD[Visit]):
         limit: int = 100,
     ) -> List[Visit]:
         """
+
         Get visits that have orders of a particular order type.
 
+
+
         Args:
+
             db: Database session
+
             order_type_id: Order type ID to filter by
+
             start_date: Optional start date (YYYY-MM-DD format)
+
             end_date: Optional end date (YYYY-MM-DD format)
+
             patient_id: Optional patient ID to filter by
+
             skip: Number of records to skip
+
             limit: Maximum number of records to return
 
+
+
         Returns:
+
             List of visits that have orders of the specified type
+
         """
+
         from app.models import Order, Encounter
 
         # Join visits with encounters and orders to find visits that have orders of the specified type
+
         # Relationship: Visit -> Encounter -> Order
+
         query = (
             db.query(self.model)
             .join(Encounter, self.model.visit_id == Encounter.visit_id)
@@ -270,6 +388,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
         )
 
         # Apply date range filter if provided
+
         if start_date and end_date:
             query = query.filter(
                 and_(
@@ -277,12 +396,15 @@ class VisitsCRUD(BaseCRUD[Visit]):
                     self.model.date_started <= end_date,
                 )
             )
+
         elif start_date:
             query = query.filter(self.model.date_started >= start_date)
+
         elif end_date:
             query = query.filter(self.model.date_started <= end_date)
 
         # Apply patient filter if provided
+
         if patient_id:
             query = query.filter(self.model.patient_id == patient_id)
 
@@ -307,33 +429,57 @@ class VisitsCRUD(BaseCRUD[Visit]):
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
         """
+
         Get visits that have orders of a particular order type with enriched patient information.
+
         Uses joins to avoid N+1 queries for optimal performance.
 
+
+
         Args:
+
             db: Database session
+
             order_type_id: Order type ID to filter by
+
             start_date: Optional start date (YYYY-MM-DD format)
+
             end_date: Optional end date (YYYY-MM-DD format)
+
             patient_id: Optional patient ID to filter by
+
             location_id: Optional location ID to filter by
+
             days: Optional number of days to look back from today (e.g., 1 for today)
+
             free_text: Optional free-text search in patient names and visit details
+
             skip: Number of records to skip
+
             limit: Maximum number of records to return
 
+
+
         Returns:
+
             List of visits with enriched patient information
+
         """
+
         from app.models import Order, Encounter, Person, PersonName
+
         from sqlalchemy.orm import aliased
+
         from sqlalchemy import func
 
         # Create aliases for Person and PersonName tables
+
         PatientPerson = aliased(Person)
+
         PatientPersonName = aliased(PersonName)
 
         # Use a single query with joins to get all data efficiently
+
         query = (
             db.query(
                 self.model,
@@ -374,6 +520,7 @@ class VisitsCRUD(BaseCRUD[Visit]):
         )
 
         # Apply date range filter if provided
+
         if start_date and end_date:
             query = query.filter(
                 and_(
@@ -381,38 +528,49 @@ class VisitsCRUD(BaseCRUD[Visit]):
                     self.model.date_started <= end_date,
                 )
             )
+
         elif start_date:
             query = query.filter(self.model.date_started >= start_date)
+
         elif end_date:
             query = query.filter(self.model.date_started <= end_date)
+
         elif days is not None:
             # Filter by number of days from today
+
             from datetime import datetime, timedelta
+
             from sqlalchemy import func
 
             # Calculate the start date (N days ago from today)
+
             start_date_days_ago = datetime.now().date() - timedelta(days=days - 1)
 
             # Filter visits from the last N days (inclusive of today)
+
             query = query.filter(
                 func.date(self.model.date_started) >= start_date_days_ago
             )
 
         # Apply patient filter if provided
+
         if patient_id:
             query = query.filter(self.model.patient_id == patient_id)
 
         # Apply location filter if provided
+
         if location_id:
             query = query.filter(self.model.location_id == location_id)
 
         # Apply free-text search filter if provided
+
         if free_text:
             from sqlalchemy import or_, cast, String
 
             search_term = f"%{free_text.lower()}%"
 
             # Search in patient names (given, family, middle, prefix)
+
             patient_name_filters = [
                 func.lower(PatientPersonName.given_name).like(search_term),
                 func.lower(PatientPersonName.family_name).like(search_term),
@@ -421,12 +579,15 @@ class VisitsCRUD(BaseCRUD[Visit]):
             ]
 
             # Search in visit details (UUID, indication concept if available)
+
             visit_filters = [
                 func.lower(cast(self.model.uuid, String)).like(search_term),
             ]
 
             # Combine all search filters with OR
+
             search_conditions = patient_name_filters + visit_filters
+
             query = query.filter(or_(*search_conditions))
 
         results = (
@@ -437,27 +598,38 @@ class VisitsCRUD(BaseCRUD[Visit]):
         )
 
         # Transform results into enriched visit dictionaries
+
         enriched_visits = []
+
         for row in results:
             visit = row[0]  # The Visit object is first in the tuple
 
             # Build patient name
+
             patient_name_parts = []
+
             if row.patient_prefix:
                 patient_name_parts.append(row.patient_prefix)
+
             if row.patient_given_name:
                 patient_name_parts.append(row.patient_given_name)
+
             if row.patient_middle_name:
                 patient_name_parts.append(row.patient_middle_name)
+
             if row.patient_family_name:
                 patient_name_parts.append(row.patient_family_name)
+
             if row.patient_family_name2:
                 patient_name_parts.append(row.patient_family_name2)
+
             if row.patient_family_name_suffix:
                 patient_name_parts.append(row.patient_family_name_suffix)
+
             patient_name = " ".join(patient_name_parts) if patient_name_parts else None
 
             # Create enriched visit dictionary
+
             visit_dict = {
                 "visit_id": visit.visit_id,
                 "patient_id": visit.patient_id,
@@ -499,21 +671,37 @@ class VisitsCRUD(BaseCRUD[Visit]):
         date_stopped: Optional[str] = None,
     ) -> Optional[Visit]:
         """
+
         Stop a visit by setting the date_stopped field.
 
+
+
         Args:
+
             db: Database session
+
             visit_id: Visit ID
+
             stopped_by: User ID who stopped the visit
+
             date_stopped: Optional date when visit was stopped (defaults to now)
 
+
+
         Returns:
+
             Updated visit object if found, None otherwise
 
+
+
         Raises:
+
             Exception: If database operation fails
+
         """
+
         visit = self.get(db, visit_id)
+
         if not visit:
             return None
 
@@ -522,15 +710,21 @@ class VisitsCRUD(BaseCRUD[Visit]):
         visit.date_stopped = (
             datetime.fromisoformat(date_stopped) if date_stopped else datetime.utcnow()
         )
+
         visit.changed_by = stopped_by
+
         visit.date_changed = datetime.utcnow()
 
         try:
             db.commit()
+
             db.refresh(visit)
+
             return visit
+
         except Exception as e:
             db.rollback()
+
             raise e
 
     def void_visit(
@@ -541,105 +735,170 @@ class VisitsCRUD(BaseCRUD[Visit]):
         void_reason: Optional[str] = None,
     ) -> Optional[Visit]:
         """
+
         Void a visit.
 
+
+
         Args:
+
             db: Database session
+
             visit_id: Visit ID
+
             voided_by: User ID who voided the visit
+
             void_reason: Optional reason for voiding
 
+
+
         Returns:
+
             Updated visit object if found, None otherwise
 
+
+
         Raises:
+
             Exception: If database operation fails
+
         """
+
         visit = self.get(db, visit_id)
+
         if not visit:
             return None
 
         from datetime import datetime
 
         visit.voided = True
+
         visit.voided_by = voided_by
+
         visit.date_voided = datetime.utcnow()
+
         visit.void_reason = void_reason
+
         visit.changed_by = voided_by
+
         visit.date_changed = datetime.utcnow()
 
         try:
             db.commit()
+
             db.refresh(visit)
+
             return visit
+
         except Exception as e:
             db.rollback()
+
             raise e
 
     def unvoid_visit(
         self, db: Session, visit_id: int, unvoided_by: int
     ) -> Optional[Visit]:
         """
+
         Unvoid a visit.
 
+
+
         Args:
+
             db: Database session
+
             visit_id: Visit ID
+
             unvoided_by: User ID who unvoided the visit
 
+
+
         Returns:
+
             Updated visit object if found, None otherwise
 
+
+
         Raises:
+
             Exception: If database operation fails
+
         """
+
         visit = self.get(db, visit_id)
+
         if not visit:
             return None
 
         from datetime import datetime
 
         visit.voided = False
+
         visit.voided_by = None
+
         visit.date_voided = None
+
         visit.void_reason = None
+
         visit.changed_by = unvoided_by
+
         visit.date_changed = datetime.utcnow()
 
         try:
             db.commit()
+
             db.refresh(visit)
+
             return visit
+
         except Exception as e:
             db.rollback()
+
             raise e
 
     def _set_default_values(self, obj_data: dict) -> None:
         """
+
         Set default values for new visit objects.
 
+
+
         Args:
+
             obj_data: Dictionary containing visit data
+
         """
+
         from datetime import datetime
 
         # Set default date_started if not provided
+
         if not obj_data.get("date_started"):
             obj_data["date_started"] = datetime.utcnow()
 
     def _set_audit_fields(self, db_obj: Visit, update_data: dict) -> None:
         """
+
         Set audit fields when updating visit objects.
 
+
+
         Args:
+
             db_obj: Visit object being updated
+
             update_data: Data being used for the update
+
         """
+
         from datetime import datetime
 
         # Set changed_by and date_changed if not already set
+
         if not hasattr(db_obj, "changed_by") or db_obj.changed_by is None:
             # Try to get from update_data, otherwise use creator
+
             db_obj.changed_by = update_data.get("changed_by", db_obj.creator)
 
         db_obj.date_changed = datetime.utcnow()
