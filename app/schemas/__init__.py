@@ -121,6 +121,12 @@ from .provider import (
     PersonInfo as ProviderPersonInfo,
     PersonNameInfo,
 )
+from .physical_exam import (
+    ExamNoteInput,
+    ExamNoteUpdate,
+    PhysicalExamCreate,
+    PhysicalExamResponse,
+)
 from .visit_type import (
     VisitTypeBase,
     VisitTypeCreate,
@@ -239,6 +245,11 @@ __all__ = [
     "ProviderListResponse",
     "ProviderPersonInfo",
     "PersonNameInfo",
+    # Physical Exam
+    "ExamNoteInput",
+    "ExamNoteUpdate",
+    "PhysicalExamCreate",
+    "PhysicalExamResponse",
     # Visit Type
     "VisitTypeBase",
     "VisitTypeCreate",

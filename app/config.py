@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     vital_signs_concept_ids: str = ""
     vital_signs_body_position_concept_id: str = ""
 
+    # Physical examination settings
+    consultation_encounter_type_id: int = 1
+    physical_exam_concept_id: int = 35
+
     # OpenMRS REST configuration for post-processing (e.g., search index updates)
     openmrs_base_url: str = "http://localhost:8080/openmrs"
     openmrs_rest_username: str | None = None
