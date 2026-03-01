@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.models.encounter import Encounter
+from app.models.encounter_provider import EncounterProvider
 from app.models.obs import Obs
 from app.models.visit import Visit
 from app.schemas.physical_exam import (
@@ -84,6 +85,28 @@ class PhysicalExamCRUD:
         db.add(encounter)
         db.flush()
         return encounter, True
+
+    def _link_provider(
+        self,
+        db: Session,
+        encounter: Encounter,
+        provider_id: int,
+        encounter_role_id: int,
+        creator: int,
+    ) -> None:
+        """Insert an encounter_provider row linking the provider to the encounter."""
+        now = datetime.utcnow()
+        ep = EncounterProvider(
+            encounter_id=encounter.encounter_id,
+            provider_id=provider_id,
+            encounter_role_id=encounter_role_id,
+            creator=creator,
+            date_created=now,
+            voided=False,
+            uuid=str(uuid.uuid4()),
+        )
+        db.add(ep)
+        db.flush()
 
     def _create_obs(
         self,
@@ -179,6 +202,25 @@ class PhysicalExamCRUD:
         encounter, created = self._get_or_create_encounter(
             db, visit, payload.creator, payload.location_id
         )
+
+        if payload.provider_id:
+            already_linked = (
+                db.query(EncounterProvider)
+                .filter(
+                    EncounterProvider.encounter_id == encounter.encounter_id,
+                    EncounterProvider.provider_id == payload.provider_id,
+                    EncounterProvider.voided == False,
+                )
+                .first()
+            )
+            if not already_linked:
+                self._link_provider(
+                    db,
+                    encounter,
+                    payload.provider_id,
+                    payload.encounter_role_id or 1,
+                    payload.creator,
+                )
 
         obs_list: List[Obs] = []
         for note in payload.notes:

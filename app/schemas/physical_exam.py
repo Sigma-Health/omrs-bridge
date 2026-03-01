@@ -33,6 +33,8 @@ class PhysicalExamCreate(BaseModel):
     visit_uuid: Optional[str] = None
     creator: int
     location_id: int
+    provider_id: Optional[int] = None
+    encounter_role_id: Optional[int] = 1
     notes: List[ExamNoteInput]
 
 
