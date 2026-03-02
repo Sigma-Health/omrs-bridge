@@ -16,6 +16,7 @@ from app.api.visits import router as visits_router
 from app.api.vitals import router as vitals_router
 from app.api.physical_exam import router as physical_exam_router
 from app.api.chief_complaint import router as chief_complaint_router
+from app.api.visit_notes import router as visit_notes_router
 from app.api.provider import router as provider_router
 from app.api.visit_types import router as visit_types_router
 from app.config import settings
@@ -153,6 +154,11 @@ app.include_router(
     chief_complaint_router,
     prefix="/api/v1/chief-complaint",
     tags=["chief-complaint"],
+)
+app.include_router(
+    visit_notes_router,
+    prefix="/api/v1/visit-notes",
+    tags=["visit-notes"],
 )
 
 

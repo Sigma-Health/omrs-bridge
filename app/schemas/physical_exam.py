@@ -67,3 +67,12 @@ class PhysicalExamResponse(BaseModel):
     visit_id: int
     created: bool
     observations: List[VitalSign]
+
+
+class PhysicalExamReadResponse(BaseModel):
+    """Read-only physical examination response (no created field)."""
+
+    encounter_id: int
+    encounter_uuid: str
+    visit_id: int
+    observations: List[VitalSign]
