@@ -25,11 +25,15 @@ class ChiefComplaintInput(BaseModel):
     @model_validator(mode="after")
     def validate_complaint(self) -> "ChiefComplaintInput":
         if self.value_coded is None and self.value_text is None:
-            raise ValueError("Either value_coded or value_text must be provided for chief complaint")
+            raise ValueError(
+                "Either value_coded or value_text must be provided for chief complaint"
+            )
         if self.value_coded is not None and self.value_text is not None:
             raise ValueError("Provide either value_coded or value_text, not both")
         if (self.duration_value is None) != (self.duration_unit_coded is None):
-            raise ValueError("duration_value and duration_unit_coded must both be provided or both omitted")
+            raise ValueError(
+                "duration_value and duration_unit_coded must both be provided or both omitted"
+            )
         return self
 
 
@@ -61,6 +65,7 @@ class ChiefComplaintObsItem(BaseModel):
     concept_id: int
     concept_name: Optional[str] = None
     value_coded: Optional[int] = None
+    value_coded_name: Optional[str] = None
     value_text: Optional[str] = None
     value_numeric: Optional[float] = None
     obs_datetime: Optional[datetime] = None

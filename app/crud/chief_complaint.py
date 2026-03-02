@@ -194,6 +194,7 @@ class ChiefComplaintCRUD:
             concept_id=obs.concept_id,
             concept_name=self._concept_name(db, obs.concept_id),
             value_coded=obs.value_coded,
+            value_coded_name=self._concept_name(db, obs.value_coded),
             value_text=obs.value_text,
             value_numeric=obs.value_numeric,
             obs_datetime=obs.obs_datetime,
