@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     cc_duration_unit_concept_id: int = 57386
     cc_hpi_concept_id: int = 16086
 
+    # Chief complaint form_namespace_and_path values
+    cc_form_group: str = "Bahmni^History and Examination.1/25-0"
+    cc_form_complaint: str = "Bahmni^History and Examination.1/25-0/26-0"
+    cc_form_duration: str = "Bahmni^History and Examination.1/25-0/28-0"
+    cc_form_duration_unit: str = "Bahmni^History and Examination.1/25-0/29-0"
+    cc_form_hpi: str = "Bahmni^History and Examination.1/7-0"
+
     # OpenMRS REST configuration for post-processing (e.g., search index updates)
     openmrs_base_url: str = "http://localhost:8080/openmrs"
     openmrs_rest_username: str | None = None

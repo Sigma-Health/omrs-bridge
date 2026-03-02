@@ -143,6 +143,7 @@ class ChiefComplaintCRUD:
         value_text: Optional[str] = None,
         value_numeric: Optional[float] = None,
         comments: Optional[str] = None,
+        form_namespace_and_path: Optional[str] = None,
     ) -> Obs:
         obs = Obs(
             person_id=encounter.patient_id,
@@ -160,6 +161,7 @@ class ChiefComplaintCRUD:
             voided=False,
             status="FINAL",
             uuid=str(uuid.uuid4()),
+            form_namespace_and_path=form_namespace_and_path,
         )
         db.add(obs)
         db.flush()
@@ -285,6 +287,7 @@ class ChiefComplaintCRUD:
             payload.creator,
             payload.location_id,
             obs_dt,
+            form_namespace_and_path=settings.cc_form_group,
         )
 
         complaint_concept_id = (
@@ -303,6 +306,7 @@ class ChiefComplaintCRUD:
             value_coded=c.value_coded,
             value_text=c.value_text,
             comments=c.comments,
+            form_namespace_and_path=settings.cc_form_complaint,
         )
 
         if c.duration_value is not None:
@@ -315,6 +319,7 @@ class ChiefComplaintCRUD:
                 obs_dt,
                 obs_group_id=group.obs_id,
                 value_numeric=c.duration_value,
+                form_namespace_and_path=settings.cc_form_duration,
             )
             self._make_obs(
                 db,
@@ -325,6 +330,7 @@ class ChiefComplaintCRUD:
                 obs_dt,
                 obs_group_id=group.obs_id,
                 value_coded=c.duration_unit_coded,
+                form_namespace_and_path=settings.cc_form_duration_unit,
             )
 
         if payload.hpi:
@@ -336,6 +342,7 @@ class ChiefComplaintCRUD:
                 payload.location_id,
                 obs_dt,
                 value_text=payload.hpi,
+                form_namespace_and_path=settings.cc_form_hpi,
             )
 
         db.commit()
