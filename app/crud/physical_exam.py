@@ -48,7 +48,13 @@ class PhysicalExamCRUD:
         if not visit:
             identifier = visit_id or visit_uuid
             raise ValueError(f"Visit {identifier} not found")
+
         return visit
+
+    def _assert_visit_active(self, visit: Visit) -> None:
+        """Raise ValueError if the visit has been stopped."""
+        if visit.date_stopped is not None:
+            raise ValueError(f"Visit {visit.visit_id} is no longer active")
 
     def _get_or_create_encounter(
         self, db: Session, visit: Visit, creator: int, location_id: int
@@ -199,6 +205,7 @@ class PhysicalExamCRUD:
         creates all obs records, returns PhysicalExamResponse data.
         """
         visit = self._resolve_visit(db, payload.visit_id, payload.visit_uuid)
+        self._assert_visit_active(visit)
         encounter, created = self._get_or_create_encounter(
             db, visit, payload.creator, payload.location_id
         )
@@ -323,6 +330,16 @@ class PhysicalExamCRUD:
         if not obs:
             raise ValueError(f"Physical exam note {obs_id} not found")
 
+        encounter = (
+            db.query(Encounter)
+            .filter(Encounter.encounter_id == obs.encounter_id)
+            .first()
+        )
+        if encounter and encounter.visit_id:
+            visit = db.query(Visit).filter(Visit.visit_id == encounter.visit_id).first()
+            if visit:
+                self._assert_visit_active(visit)
+
         if payload.value_text is not None:
             obs.value_text = payload.value_text
         if payload.comments is not None:
@@ -333,11 +350,12 @@ class PhysicalExamCRUD:
         db.commit()
         db.refresh(obs)
 
-        encounter = (
-            db.query(Encounter)
-            .filter(Encounter.encounter_id == obs.encounter_id)
-            .first()
-        )
+        if not encounter:
+            encounter = (
+                db.query(Encounter)
+                .filter(Encounter.encounter_id == obs.encounter_id)
+                .first()
+            )
 
         return self._hydrate_obs(db, obs, encounter)
 
@@ -349,6 +367,16 @@ class PhysicalExamCRUD:
         obs = db.query(Obs).filter(Obs.obs_id == obs_id, Obs.voided == False).first()
         if not obs:
             raise ValueError(f"Physical exam note {obs_id} not found")
+
+        encounter = (
+            db.query(Encounter)
+            .filter(Encounter.encounter_id == obs.encounter_id)
+            .first()
+        )
+        if encounter and encounter.visit_id:
+            visit = db.query(Visit).filter(Visit.visit_id == encounter.visit_id).first()
+            if visit:
+                self._assert_visit_active(visit)
 
         obs.voided = True
         obs.date_voided = datetime.utcnow()
