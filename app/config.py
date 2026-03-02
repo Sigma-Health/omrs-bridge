@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     consultation_encounter_role_id: int = 1
     physical_exam_concept_ids: str = "35"
 
+    # Chief complaint concept IDs
+    cc_group_concept_id: int = 57422
+    cc_coded_concept_id: int = 57385
+    cc_text_concept_id: int = 30201
+    cc_duration_concept_id: int = 11266
+    cc_duration_unit_concept_id: int = 57386
+    cc_hpi_concept_id: int = 16086
+
     # OpenMRS REST configuration for post-processing (e.g., search index updates)
     openmrs_base_url: str = "http://localhost:8080/openmrs"
     openmrs_rest_username: str | None = None
