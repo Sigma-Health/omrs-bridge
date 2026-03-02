@@ -2,16 +2,17 @@
 Physical examination notes API endpoints.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth import get_current_api_key
-from app.crud.physical_exam import physical_exam
+from app.crud.physical_exam import physical_exam, PhysicalExamError
 from app.schemas.physical_exam import (
     PhysicalExamCreate,
     PhysicalExamResponse,
     ExamNoteUpdate,
+    ExamNoteVoid,
 )
 from app.schemas.vitals import VitalSign
 
@@ -34,12 +35,13 @@ async def get_physical_exam_notes_by_visit_id(
         return physical_exam.get_exam_notes_by_visit(
             db, visit_id=visit_id, visit_uuid=None
         )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+    except PhysicalExamError as e:
         raise HTTPException(
-            status_code=400,
-            detail=f"Failed to retrieve physical exam notes: {str(e)}",
+            status_code=e.status, detail={"status": "error", "detail": e.code}
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=400, detail={"status": "error", "detail": "unexpected_error"}
         )
 
 
@@ -59,12 +61,13 @@ async def get_physical_exam_notes_by_visit_uuid(
         return physical_exam.get_exam_notes_by_visit(
             db, visit_id=None, visit_uuid=visit_uuid
         )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+    except PhysicalExamError as e:
         raise HTTPException(
-            status_code=400,
-            detail=f"Failed to retrieve physical exam notes: {str(e)}",
+            status_code=e.status, detail={"status": "error", "detail": e.code}
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=400, detail={"status": "error", "detail": "unexpected_error"}
         )
 
 
@@ -79,12 +82,13 @@ async def get_physical_exam_note(
     """
     try:
         return physical_exam.get_exam_note(db, obs_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+    except PhysicalExamError as e:
         raise HTTPException(
-            status_code=400,
-            detail=f"Failed to retrieve physical exam note: {str(e)}",
+            status_code=e.status, detail={"status": "error", "detail": e.code}
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=400, detail={"status": "error", "detail": "unexpected_error"}
         )
 
 
@@ -102,18 +106,20 @@ async def update_physical_exam_note(
     """
     try:
         return physical_exam.update_exam_note(db, obs_id, payload)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+    except PhysicalExamError as e:
         raise HTTPException(
-            status_code=400,
-            detail=f"Failed to update physical exam note: {str(e)}",
+            status_code=e.status, detail={"status": "error", "detail": e.code}
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=400, detail={"status": "error", "detail": "unexpected_error"}
         )
 
 
-@router.delete("/{obs_id}")
+@router.delete("/{obs_id}", status_code=204)
 async def delete_physical_exam_note(
     obs_id: int,
+    payload: ExamNoteVoid = ExamNoteVoid(),
     db: Session = Depends(get_db),
     api_key: str = Depends(get_current_api_key),
 ):
@@ -121,16 +127,19 @@ async def delete_physical_exam_note(
     Void a physical examination note by obs_id.
 
     The record is not deleted from the database — it is marked as voided.
-    Returns 404 if the note does not exist or is already voided.
+    Accepts an optional body with void_reason and voided_by.
+    Returns 204 No Content on success, 404 if not found or already voided.
     """
     try:
-        return physical_exam.delete_exam_note(db, obs_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+        physical_exam.delete_exam_note(db, obs_id, payload)
+        return Response(status_code=204)
+    except PhysicalExamError as e:
         raise HTTPException(
-            status_code=400,
-            detail=f"Failed to delete physical exam note: {str(e)}",
+            status_code=e.status, detail={"status": "error", "detail": e.code}
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=400, detail={"status": "error", "detail": "unexpected_error"}
         )
 
 
@@ -150,23 +159,13 @@ async def create_physical_exam_notes(
       PHYSICAL_EXAM_CONCEPT_ID (or a per-note override)
     - Returns the encounter details and all created observations
     """
-    if not payload.visit_id and not payload.visit_uuid:
-        raise HTTPException(
-            status_code=400,
-            detail="Either visit_id or visit_uuid must be provided",
-        )
-    if not payload.notes:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one note must be provided",
-        )
-
     try:
         return physical_exam.create_exam_notes(db, payload)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+    except PhysicalExamError as e:
         raise HTTPException(
-            status_code=400,
-            detail=f"Failed to create physical exam notes: {str(e)}",
+            status_code=e.status, detail={"status": "error", "detail": e.code}
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=400, detail={"status": "error", "detail": "unexpected_error"}
         )

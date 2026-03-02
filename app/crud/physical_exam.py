@@ -17,10 +17,20 @@ from app.schemas.physical_exam import (
     PhysicalExamCreate,
     ExamNoteInput,
     ExamNoteUpdate,
+    ExamNoteVoid,
     PhysicalExamResponse,
 )
 from app.schemas.vitals import VitalSign
-from app.config import settings
+from app.config import settings, get_physical_exam_concept_ids
+
+
+class PhysicalExamError(Exception):
+    """Raised for known physical exam business-rule violations."""
+
+    def __init__(self, code: str, status: int = 404):
+        self.code = code
+        self.status = status
+        super().__init__(code)
 
 
 class PhysicalExamCRUD:
@@ -43,18 +53,17 @@ class PhysicalExamCRUD:
                 .first()
             )
         else:
-            raise ValueError("Either visit_id or visit_uuid must be provided")
+            raise PhysicalExamError("visit_identifier_required", status=400)
 
         if not visit:
-            identifier = visit_id or visit_uuid
-            raise ValueError(f"Visit {identifier} not found")
+            raise PhysicalExamError("visit_not_found")
 
         return visit
 
     def _assert_visit_active(self, visit: Visit) -> None:
-        """Raise ValueError if the visit has been stopped."""
+        """Raise PhysicalExamError if the visit has been stopped."""
         if visit.date_stopped is not None:
-            raise ValueError(f"Visit {visit.visit_id} is no longer active")
+            raise PhysicalExamError("visit_not_active")
 
     def _get_or_create_encounter(
         self, db: Session, visit: Visit, creator: int, location_id: int
@@ -123,8 +132,11 @@ class PhysicalExamCRUD:
         location_id: int,
     ) -> Obs:
         """Insert a single obs record for an examination note."""
+        concept_ids = get_physical_exam_concept_ids()
         concept_id = (
-            note.concept_id if note.concept_id else settings.physical_exam_concept_id
+            note.concept_id
+            if note.concept_id
+            else (concept_ids[0] if concept_ids else 35)
         )
         now = datetime.utcnow()
         obs = Obs(
@@ -146,40 +158,35 @@ class PhysicalExamCRUD:
         return obs
 
     def _hydrate_obs(self, db: Session, obs: Obs, encounter: Encounter) -> VitalSign:
-        """Fetch concept name and creator name, then build a VitalSign response."""
-        concept_row = db.execute(
+        """Fetch all supplementary data in a single JOIN query and build a VitalSign response."""
+        row = db.execute(
             text(
-                "SELECT cn.name FROM concept_name cn "
-                "WHERE cn.concept_id = :cid AND cn.locale = 'en' "
-                "AND cn.concept_name_type = 'FULLY_SPECIFIED' AND cn.voided = 0 LIMIT 1"
+                "SELECT "
+                "  cn.name AS concept_name, "
+                "  CONCAT_WS(' ', pn.given_name, pn.family_name) AS creator_name, "
+                "  e.uuid AS encounter_uuid, "
+                "  v.uuid AS visit_uuid "
+                "FROM obs o "
+                "LEFT JOIN concept_name cn "
+                "  ON cn.concept_id = o.concept_id "
+                "  AND cn.locale = 'en' "
+                "  AND cn.concept_name_type = 'FULLY_SPECIFIED' "
+                "  AND cn.voided = 0 "
+                "LEFT JOIN users u ON u.user_id = o.creator "
+                "LEFT JOIN person_name pn "
+                "  ON pn.person_id = u.person_id "
+                "  AND pn.preferred = 1 AND pn.voided = 0 "
+                "LEFT JOIN encounter e ON e.encounter_id = o.encounter_id "
+                "LEFT JOIN visit v ON v.visit_id = e.visit_id "
+                "WHERE o.obs_id = :oid"
             ),
-            {"cid": obs.concept_id},
+            {"oid": obs.obs_id},
         ).fetchone()
-        concept_name = concept_row[0] if concept_row else "Unknown"
 
-        creator_row = db.execute(
-            text(
-                "SELECT CONCAT_WS(' ', pn.given_name, pn.family_name) "
-                "FROM users u "
-                "LEFT JOIN person_name pn ON u.person_id = pn.person_id "
-                "    AND pn.preferred = 1 AND pn.voided = 0 "
-                "WHERE u.user_id = :uid LIMIT 1"
-            ),
-            {"uid": obs.creator},
-        ).fetchone()
-        creator_name = creator_row[0] if creator_row else None
-
-        encounter_uuid_row = db.execute(
-            text("SELECT uuid FROM encounter WHERE encounter_id = :eid LIMIT 1"),
-            {"eid": encounter.encounter_id},
-        ).fetchone()
-        encounter_uuid = encounter_uuid_row[0] if encounter_uuid_row else ""
-
-        visit_uuid_row = db.execute(
-            text("SELECT uuid FROM visit WHERE visit_id = :vid LIMIT 1"),
-            {"vid": encounter.visit_id},
-        ).fetchone()
-        visit_uuid = visit_uuid_row[0] if visit_uuid_row else ""
+        concept_name = row[0] if row and row[0] else "Unknown"
+        creator_name = row[1] if row and row[1] else None
+        encounter_uuid = row[2] if row and row[2] else ""
+        visit_uuid = row[3] if row and row[3] else ""
 
         return VitalSign(
             obs_id=obs.obs_id,
@@ -225,7 +232,8 @@ class PhysicalExamCRUD:
                     db,
                     encounter,
                     payload.provider_id,
-                    payload.encounter_role_id or 1,
+                    payload.encounter_role_id
+                    or settings.consultation_encounter_role_id,
                     payload.creator,
                 )
 
@@ -283,7 +291,7 @@ class PhysicalExamCRUD:
             db.query(Obs)
             .filter(
                 Obs.encounter_id == encounter.encounter_id,
-                Obs.concept_id == settings.physical_exam_concept_id,
+                Obs.concept_id.in_(get_physical_exam_concept_ids() or [35]),
                 Obs.voided == False,
             )
             .order_by(Obs.obs_datetime.desc())
@@ -307,7 +315,7 @@ class PhysicalExamCRUD:
         """
         obs = db.query(Obs).filter(Obs.obs_id == obs_id, Obs.voided == False).first()
         if not obs:
-            raise ValueError(f"Physical exam note {obs_id} not found")
+            raise PhysicalExamError("exam_note_not_found")
 
         encounter = (
             db.query(Encounter)
@@ -315,7 +323,7 @@ class PhysicalExamCRUD:
             .first()
         )
         if not encounter:
-            raise ValueError(f"Encounter for obs {obs_id} not found")
+            raise PhysicalExamError("encounter_not_found")
 
         return self._hydrate_obs(db, obs, encounter)
 
@@ -328,7 +336,7 @@ class PhysicalExamCRUD:
         """
         obs = db.query(Obs).filter(Obs.obs_id == obs_id, Obs.voided == False).first()
         if not obs:
-            raise ValueError(f"Physical exam note {obs_id} not found")
+            raise PhysicalExamError("exam_note_not_found")
 
         encounter = (
             db.query(Encounter)
@@ -346,27 +354,29 @@ class PhysicalExamCRUD:
             obs.comments = payload.comments
         if payload.obs_datetime is not None:
             obs.obs_datetime = payload.obs_datetime
+        if payload.editor is not None:
+            obs.changed_by = payload.editor
+            obs.date_changed = datetime.utcnow()
 
         db.commit()
         db.refresh(obs)
 
-        if not encounter:
-            encounter = (
-                db.query(Encounter)
-                .filter(Encounter.encounter_id == obs.encounter_id)
-                .first()
-            )
+        encounter = (
+            db.query(Encounter)
+            .filter(Encounter.encounter_id == obs.encounter_id)
+            .first()
+        )
 
         return self._hydrate_obs(db, obs, encounter)
 
-    def delete_exam_note(self, db: Session, obs_id: int) -> dict:
+    def delete_exam_note(self, db: Session, obs_id: int, payload: ExamNoteVoid) -> None:
         """
         Void a physical exam obs by obs_id.
         Raises ValueError if not found or already voided.
         """
         obs = db.query(Obs).filter(Obs.obs_id == obs_id, Obs.voided == False).first()
         if not obs:
-            raise ValueError(f"Physical exam note {obs_id} not found")
+            raise PhysicalExamError("exam_note_not_found")
 
         encounter = (
             db.query(Encounter)
@@ -380,13 +390,11 @@ class PhysicalExamCRUD:
 
         obs.voided = True
         obs.date_voided = datetime.utcnow()
+        if payload.void_reason is not None:
+            obs.void_reason = payload.void_reason
+        if payload.voided_by is not None:
+            obs.voided_by = payload.voided_by
         db.commit()
-
-        return {
-            "success": True,
-            "obs_id": obs_id,
-            "message": "Physical exam note voided successfully",
-        }
 
 
 physical_exam = PhysicalExamCRUD()

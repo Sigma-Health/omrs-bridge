@@ -35,7 +35,8 @@ class Settings(BaseSettings):
 
     # Physical examination settings
     consultation_encounter_type_id: int = 1
-    physical_exam_concept_id: int = 35
+    consultation_encounter_role_id: int = 1
+    physical_exam_concept_ids: str = "35"
 
     # OpenMRS REST configuration for post-processing (e.g., search index updates)
     openmrs_base_url: str = "http://localhost:8080/openmrs"
@@ -80,6 +81,20 @@ def get_vital_signs_concept_ids() -> list[int]:
                 ids.append(body_pos_id)
         except ValueError:
             pass
+    return ids
+
+
+# Physical exam concept ID helpers
+def get_physical_exam_concept_ids() -> list[int]:
+    """Parse comma-separated physical exam concept IDs from environment variable"""
+    ids = []
+    for part in settings.physical_exam_concept_ids.split(","):
+        part = part.strip()
+        if part:
+            try:
+                ids.append(int(part))
+            except ValueError:
+                pass
     return ids
 
 

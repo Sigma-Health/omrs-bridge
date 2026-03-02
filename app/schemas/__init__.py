@@ -124,6 +124,7 @@ from .provider import (
 from .physical_exam import (
     ExamNoteInput,
     ExamNoteUpdate,
+    ExamNoteVoid,
     PhysicalExamCreate,
     PhysicalExamResponse,
 )
@@ -248,6 +249,7 @@ __all__ = [
     # Physical Exam
     "ExamNoteInput",
     "ExamNoteUpdate",
+    "ExamNoteVoid",
     "PhysicalExamCreate",
     "PhysicalExamResponse",
     # Visit Type

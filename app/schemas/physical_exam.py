@@ -2,7 +2,7 @@
 Schemas for physical examination note creation.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -24,6 +24,14 @@ class ExamNoteUpdate(BaseModel):
     value_text: Optional[str] = None
     comments: Optional[str] = None
     obs_datetime: Optional[datetime] = None
+    editor: Optional[int] = None
+
+
+class ExamNoteVoid(BaseModel):
+    """Optional body for voiding a physical examination note."""
+
+    void_reason: Optional[str] = None
+    voided_by: Optional[int] = None
 
 
 class PhysicalExamCreate(BaseModel):
@@ -36,6 +44,19 @@ class PhysicalExamCreate(BaseModel):
     provider_id: Optional[int] = None
     encounter_role_id: Optional[int] = 1
     notes: List[ExamNoteInput]
+
+    @model_validator(mode="after")
+    def require_visit_identifier(self) -> "PhysicalExamCreate":
+        if not self.visit_id and not self.visit_uuid:
+            raise ValueError("Either visit_id or visit_uuid must be provided")
+        return self
+
+    @field_validator("notes")
+    @classmethod
+    def notes_must_not_be_empty(cls, v: List[ExamNoteInput]) -> List[ExamNoteInput]:
+        if not v:
+            raise ValueError("notes must contain at least one entry")
+        return v
 
 
 class PhysicalExamResponse(BaseModel):
