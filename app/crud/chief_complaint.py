@@ -187,6 +187,24 @@ class ChiefComplaintCRUD:
         ).fetchone()
         return row[0] if row else ""
 
+    def _creator_name(self, db: Session, creator_id: Optional[int]) -> Optional[str]:
+        if creator_id is None:
+            return None
+        row = db.execute(
+            text(
+                "SELECT CONCAT_WS(' ', pn.given_name, pn.family_name) "
+                "FROM users u "
+                "LEFT JOIN person_name pn "
+                "  ON pn.person_id = u.person_id "
+                "  AND pn.preferred = 1 "
+                "  AND pn.voided = 0 "
+                "WHERE u.user_id = :uid "
+                "LIMIT 1"
+            ),
+            {"uid": creator_id},
+        ).fetchone()
+        return row[0] if row and row[0] else None
+
     def _obs_to_item(self, db: Session, obs: Obs) -> ChiefComplaintObsItem:
         return ChiefComplaintObsItem(
             obs_id=obs.obs_id,
@@ -199,6 +217,8 @@ class ChiefComplaintCRUD:
             value_numeric=obs.value_numeric,
             obs_datetime=obs.obs_datetime,
             comments=obs.comments,
+            creator_id=obs.creator,
+            creator_name=self._creator_name(db, obs.creator),
         )
 
     def _hydrate_group(

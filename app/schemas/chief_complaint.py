@@ -70,6 +70,8 @@ class ChiefComplaintObsItem(BaseModel):
     value_numeric: Optional[float] = None
     obs_datetime: Optional[datetime] = None
     comments: Optional[str] = None
+    creator_id: Optional[int] = None
+    creator_name: Optional[str] = None
 
     class Config:
         from_attributes = True
