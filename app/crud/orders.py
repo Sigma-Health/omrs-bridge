@@ -1,5 +1,6 @@
 import logging
 import uuid
+import secrets
 
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session, aliased
@@ -42,6 +43,19 @@ class OrdersCRUD(BaseCRUD[Order]):
         obj_data["voided"] = False
         obj_data["urgency"] = obj_data.get("urgency", "ROUTINE")
         obj_data["order_action"] = obj_data.get("order_action", "NEW")
+
+    def _generate_order_number(self, db: Session) -> str:
+        """
+        Generate a unique fallback order number when not provided.
+        Format: ORD-<10_HEX_CHARS>
+        """
+        for _ in range(10):
+            candidate = f"ORD-{secrets.token_hex(5).upper()}"
+            exists = db.query(Order.order_id).filter(Order.order_number == candidate).first()
+            if not exists:
+                return candidate
+        # Extremely unlikely fallback
+        return f"ORD-{uuid.uuid4().hex[:12].upper()}"
 
     def _set_audit_fields(self, db_obj: Order, update_data: dict) -> None:
         """Set order-specific audit fields."""
@@ -124,6 +138,8 @@ class OrdersCRUD(BaseCRUD[Order]):
 
             if not obj_data.get("date_activated"):
                 obj_data["date_activated"] = now
+            if not obj_data.get("order_number"):
+                obj_data["order_number"] = self._generate_order_number(db)
 
             self._set_default_values(obj_data)
 
