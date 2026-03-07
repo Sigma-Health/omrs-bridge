@@ -2,6 +2,12 @@
 
 A FastAPI service that connects with OpenMRS database and provides a REST API for updating orders with API key authentication.
 
+## New Developer Start Here
+
+If this is your first time working on this project, read:
+
+- `docs/first_time_developer_guide.md`
+
 ## Features
 
 - 🔐 **API Key Authentication** - Secure API key-based authentication

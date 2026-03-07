@@ -97,6 +97,16 @@ class OrderReplace(OrderBase):
     care_setting: int
 
 
+class OrderCreateForVisit(OrderBase):
+    """Schema for creating an order using visit UUID."""
+
+    order_type_id: int
+    concept_id: int
+    orderer: int
+    creator: int
+    care_setting: int
+
+
 class OrderResponse(OrderBase):
     """Schema for order responses"""
 

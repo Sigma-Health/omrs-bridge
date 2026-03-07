@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session, aliased
@@ -61,6 +62,79 @@ class OrdersCRUD(BaseCRUD[Order]):
             The order if found, None otherwise
         """
         return db.query(Order).filter(Order.order_number == order_number).first()
+
+    def create_for_visit_uuid(self, db: Session, visit_uuid: str, payload: Any) -> Order:
+        """
+        Create an order by visit UUID.
+
+        Behavior:
+        - Resolve visit by UUID
+        - Reuse existing unvoided encounter for that visit with encounter_type=1
+        - If none exists, create encounter_type=1 and use it
+        - Create order linked to that encounter
+        """
+        from app.models import Visit, Encounter
+
+        visit = (
+            db.query(Visit)
+            .filter(and_(Visit.uuid == visit_uuid, Visit.voided == False))  # noqa: E712
+            .first()
+        )
+        if not visit:
+            raise LookupError("Visit not found")
+
+        if not visit.patient_id:
+            raise ValueError("Visit has no patient_id")
+
+        now = datetime.utcnow()
+        encounter = (
+            db.query(Encounter)
+            .filter(
+                and_(
+                    Encounter.visit_id == visit.visit_id,
+                    Encounter.encounter_type == 1,
+                    Encounter.voided == False,  # noqa: E712
+                )
+            )
+            .order_by(Encounter.encounter_datetime.desc(), Encounter.encounter_id.desc())
+            .first()
+        )
+
+        try:
+            if not encounter:
+                encounter = Encounter(
+                    encounter_type=1,
+                    patient_id=visit.patient_id,
+                    location_id=visit.location_id,
+                    encounter_datetime=payload.date_activated or now,
+                    creator=payload.creator,
+                    date_created=now,
+                    voided=False,
+                    visit_id=visit.visit_id,
+                    uuid=str(uuid.uuid4()),
+                )
+                db.add(encounter)
+                db.flush()
+
+            obj_data = payload.dict(exclude_unset=True)
+            obj_data["encounter_id"] = encounter.encounter_id
+            obj_data["patient_id"] = visit.patient_id
+            obj_data["uuid"] = str(uuid.uuid4())
+            obj_data["date_created"] = now
+
+            if not obj_data.get("date_activated"):
+                obj_data["date_activated"] = now
+
+            self._set_default_values(obj_data)
+
+            db_order = Order(**obj_data)
+            db.add(db_order)
+            db.commit()
+            db.refresh(db_order)
+            return db_order
+        except Exception:
+            db.rollback()
+            raise
 
     def get_orders_by_patient(
         self, db: Session, patient_id: int, skip: int = 0, limit: int = 100

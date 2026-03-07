@@ -1,6 +1,6 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 from sqlalchemy.orm import Session, selectinload, with_loader_criteria
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, text
 from datetime import datetime
 
 from .base import BaseCRUD
@@ -354,6 +354,61 @@ class ConceptsCRUD(BaseCRUD[Concept]):
             .limit(limit)
             .all()
         )
+
+    def get_lab_catalog(
+        self,
+        db: Session,
+        catalog_id: int,
+        locale: Optional[str] = None,
+    ) -> Optional[dict[str, Any]]:
+        """
+        Get lab catalog concept and its set members.
+
+        Rules:
+        - catalog_id must exist
+        - concept must be is_set=1
+        - members are read from concept_set where concept_set = catalog_id
+        """
+        catalog = self.get(db, catalog_id, locale=locale)
+        if not catalog:
+            return None
+
+        if not catalog.is_set:
+            raise ValueError("Provided catalog_id is not a set concept")
+
+        rows = db.execute(
+            text(
+                "SELECT concept_id, sort_weight "
+                "FROM concept_set "
+                "WHERE concept_set = :catalog_id "
+                "ORDER BY sort_weight IS NULL, sort_weight ASC, concept_id ASC"
+            ),
+            {"catalog_id": catalog_id},
+        ).fetchall()
+
+        member_order = [int(row.concept_id) for row in rows]
+        member_sort = {int(row.concept_id): row.sort_weight for row in rows}
+
+        members: list[Concept] = []
+        if member_order:
+            members = (
+                self._query_with_names(db, locale=locale)
+                .filter(Concept.concept_id.in_(member_order))
+                .all()
+            )
+
+            members_by_id = {member.concept_id: member for member in members}
+            members = [
+                members_by_id[concept_id]
+                for concept_id in member_order
+                if concept_id in members_by_id
+            ]
+
+        return {
+            "catalog": catalog,
+            "members": members,
+            "member_sort": member_sort,
+        }
 
     def retire_concept(
         self, db: Session, concept_id: int, retired_by: int, reason: str = None

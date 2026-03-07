@@ -43,6 +43,7 @@ from .order import (
     OrderBase,
     OrderUpdate,
     OrderReplace,
+    OrderCreateForVisit,
     OrderResponse,
     OrderUpdateResponse,
     PersonInfo,
@@ -136,6 +137,10 @@ from .visit_type import (
     VisitTypeResponse,
     VisitTypeUpdateResponse,
 )
+from .lab import (
+    LabCatalogMember,
+    LabCatalogResponse,
+)
 
 __all__ = [
     # Base
@@ -178,6 +183,7 @@ __all__ = [
     "OrderBase",
     "OrderUpdate",
     "OrderReplace",
+    "OrderCreateForVisit",
     "OrderResponse",
     "OrderUpdateResponse",
     "PersonInfo",
@@ -259,4 +265,7 @@ __all__ = [
     "VisitTypeReplace",
     "VisitTypeResponse",
     "VisitTypeUpdateResponse",
+    # Lab
+    "LabCatalogMember",
+    "LabCatalogResponse",
 ]

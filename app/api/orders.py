@@ -14,6 +14,7 @@ from app.crud import orders
 from app.schemas import (
     OrderUpdate,
     OrderReplace,
+    OrderCreateForVisit,
     OrderResponse,
     OrderUpdateResponse,
     OrderConceptDetailsResponse,
@@ -41,6 +42,49 @@ async def create_order(
         raise HTTPException(
             status_code=400,
             detail=f"Failed to create order: {str(e)}",
+        )
+
+
+@router.post("/visit/uuid/{visit_uuid}", response_model=OrderResponse)
+async def create_order_for_visit_uuid(
+    order_create: OrderCreateForVisit,
+    visit_uuid: str = Path(..., description="Visit UUID"),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Create an order for a visit UUID.
+
+    - Reuses existing encounter_type=1 for the visit if available
+    - Creates encounter_type=1 for the visit if not available
+    - Creates and returns the order linked to that encounter
+    """
+    if not validate_uuid(visit_uuid):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid visit UUID format",
+        )
+
+    try:
+        return orders.create_for_visit_uuid(
+            db=db,
+            visit_uuid=visit_uuid,
+            payload=order_create,
+        )
+    except LookupError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e),
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to create order for visit UUID: {str(e)}",
         )
 
 
