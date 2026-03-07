@@ -16,6 +16,24 @@ from app.schemas import (
 router = APIRouter(tags=["labs"])
 
 
+def _resolve_member_short_name(member) -> str | None:
+    """
+    Resolve short name for a concept.
+    Prefer ConceptName rows with concept_name_type=SHORT, fallback to concept.short_name.
+    """
+    short_candidates = [
+        name
+        for name in getattr(member, "names", [])
+        if not name.voided and (name.concept_name_type or "").upper() == "SHORT"
+    ]
+    preferred = next((name for name in short_candidates if name.locale_preferred), None)
+    if preferred and preferred.name:
+        return preferred.name
+    if short_candidates and short_candidates[0].name:
+        return short_candidates[0].name
+    return member.short_name
+
+
 @router.get("/catalog/{catalog_id}", response_model=LabCatalogResponse)
 async def get_lab_catalog(
     catalog_id: int = Path(..., description="Lab catalog concept_id"),
@@ -49,7 +67,7 @@ async def get_lab_catalog(
                 concept_id=member.concept_id,
                 uuid=member.uuid,
                 preferred_name=member.preferred_name,
-                short_name=member.short_name,
+                short_name=_resolve_member_short_name(member),
                 description=member.description,
                 datatype_id=member.datatype_id,
                 class_id=member.class_id,
