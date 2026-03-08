@@ -79,6 +79,7 @@ class PhysicalExamCRUD:
                 Encounter.encounter_type == settings.consultation_encounter_type_id,
                 Encounter.voided == False,
             )
+            .order_by(Encounter.encounter_datetime.desc(), Encounter.encounter_id.desc())
             .first()
         )
 
@@ -268,15 +269,35 @@ class PhysicalExamCRUD:
         """
         visit = self._resolve_visit(db, visit_id, visit_uuid)
 
+        concept_ids = get_physical_exam_concept_ids() or [35]
+
+        # Prefer the latest consultation encounter that actually has physical exam obs.
         encounter = (
+            db.query(Encounter)
+            .join(Obs, Obs.encounter_id == Encounter.encounter_id)
+            .filter(
+                Encounter.visit_id == visit.visit_id,
+                Encounter.encounter_type == settings.consultation_encounter_type_id,
+                Encounter.voided == False,
+                Obs.voided == False,
+                Obs.concept_id.in_(concept_ids),
+            )
+            .order_by(Encounter.encounter_datetime.desc(), Encounter.encounter_id.desc())
+            .first()
+        )
+
+        # Fallback: latest consultation encounter for the visit.
+        if not encounter:
+            encounter = (
             db.query(Encounter)
             .filter(
                 Encounter.visit_id == visit.visit_id,
                 Encounter.encounter_type == settings.consultation_encounter_type_id,
                 Encounter.voided == False,
             )
+            .order_by(Encounter.encounter_datetime.desc(), Encounter.encounter_id.desc())
             .first()
-        )
+            )
 
         if not encounter:
             return PhysicalExamResponse(
@@ -291,7 +312,7 @@ class PhysicalExamCRUD:
             db.query(Obs)
             .filter(
                 Obs.encounter_id == encounter.encounter_id,
-                Obs.concept_id.in_(get_physical_exam_concept_ids() or [35]),
+                Obs.concept_id.in_(concept_ids),
                 Obs.voided == False,
             )
             .order_by(Obs.obs_datetime.desc())

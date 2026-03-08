@@ -76,6 +76,7 @@ class ChiefComplaintCRUD:
                 Encounter.encounter_type == settings.consultation_encounter_type_id,
                 Encounter.voided == False,
             )
+            .order_by(Encounter.encounter_datetime.desc(), Encounter.encounter_id.desc())
             .first()
         )
         if existing:
@@ -379,15 +380,34 @@ class ChiefComplaintCRUD:
     ) -> ChiefComplaintVisitResponse:
         visit = self._resolve_visit(db, visit_id, visit_uuid)
 
+        # Prefer the latest consultation encounter that contains chief complaint group obs.
         encounter = (
+            db.query(Encounter)
+            .join(Obs, Obs.encounter_id == Encounter.encounter_id)
+            .filter(
+                Encounter.visit_id == visit.visit_id,
+                Encounter.encounter_type == settings.consultation_encounter_type_id,
+                Encounter.voided == False,
+                Obs.voided == False,
+                Obs.concept_id == settings.cc_group_concept_id,
+                Obs.obs_group_id == None,
+            )
+            .order_by(Encounter.encounter_datetime.desc(), Encounter.encounter_id.desc())
+            .first()
+        )
+
+        # Fallback: latest consultation encounter for the visit.
+        if not encounter:
+            encounter = (
             db.query(Encounter)
             .filter(
                 Encounter.visit_id == visit.visit_id,
                 Encounter.encounter_type == settings.consultation_encounter_type_id,
                 Encounter.voided == False,
             )
+            .order_by(Encounter.encounter_datetime.desc(), Encounter.encounter_id.desc())
             .first()
-        )
+            )
 
         if not encounter:
             return ChiefComplaintVisitResponse(
