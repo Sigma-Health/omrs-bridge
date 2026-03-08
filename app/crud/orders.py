@@ -329,7 +329,12 @@ class OrdersCRUD(BaseCRUD[Order]):
         return db.query(Order).filter(Order.voided).offset(skip).limit(limit).all()
 
     def void_order(
-        self, db: Session, order_id: int, voided_by: int, reason: str = None
+        self,
+        db: Session,
+        order_id: int,
+        voided_by: int,
+        reason: str = None,
+        force: bool = False,
     ) -> Optional[Order]:
         """
         Void an order.
@@ -340,12 +345,41 @@ class OrdersCRUD(BaseCRUD[Order]):
             voided_by: ID of the user voiding the order
             reason: Optional reason for voiding
 
+        Args:
+            force: If True, bypass visit active-status validation.
+
         Returns:
             The voided order if found, None otherwise
         """
+        from app.models import Encounter, Visit
+
         db_order = self.get(db, order_id)
         if not db_order:
             return None
+
+        if not force:
+            encounter = None
+            if db_order.encounter_id is not None:
+                encounter = (
+                    db.query(Encounter)
+                    .filter(Encounter.encounter_id == db_order.encounter_id)
+                    .first()
+                )
+
+            visit = None
+            if encounter and encounter.visit_id is not None:
+                visit = db.query(Visit).filter(Visit.visit_id == encounter.visit_id).first()
+
+            # Standard void only allowed for active visits.
+            # Active = not voided and date_stopped is null.
+            if not visit:
+                raise ValueError(
+                    "Order cannot be voided because visit context could not be resolved. Use force void if intended."
+                )
+            if visit.voided or visit.date_stopped is not None:
+                raise ValueError(
+                    "Order can only be voided for active visits. Use force void to bypass this check."
+                )
 
         db_order.voided = True
         db_order.voided_by = voided_by

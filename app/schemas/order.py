@@ -134,3 +134,10 @@ class OrderUpdateResponse(BaseModel):
     order_id: int
     updated_fields: list[str]
     order: Optional[OrderResponse] = None
+
+
+class OrderVoidRequest(BaseModel):
+    """Schema for voiding orders via JSON body."""
+
+    voided_by: int
+    reason: Optional[str] = None
