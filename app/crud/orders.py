@@ -4,7 +4,7 @@ import secrets
 
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session, aliased
-from sqlalchemy import and_
+from sqlalchemy import and_, select
 from sqlalchemy.sql import func
 from datetime import datetime
 
@@ -542,13 +542,67 @@ class OrdersCRUD(BaseCRUD[Order]):
             ConceptName,
         )
 
-        # Create aliases for Person and PersonName tables to join them multiple times
+        # Create aliases for Person tables to join them multiple times
         OrdererPerson = aliased(Person)
-        OrdererPersonName = aliased(PersonName)
         PatientPerson = aliased(Person)
-        PatientPersonName = aliased(PersonName)
         # Create alias for SHORT concept name
         ShortConceptName = aliased(ConceptName)
+
+        orderer_name_subquery = (
+            select(
+                func.concat_ws(
+                    " ",
+                    PersonName.prefix,
+                    PersonName.given_name,
+                    PersonName.middle_name,
+                    PersonName.family_name,
+                    PersonName.family_name2,
+                    PersonName.family_name_suffix,
+                )
+            )
+            .where(
+                and_(
+                    PersonName.person_id == Provider.person_id,
+                    PersonName.voided == False,  # noqa: E712
+                )
+            )
+            .order_by(
+                PersonName.preferred.desc(),
+                PersonName.date_created.desc(),
+                PersonName.person_name_id.desc(),
+            )
+            .limit(1)
+            .correlate(Provider)
+            .scalar_subquery()
+        )
+
+        patient_name_subquery = (
+            select(
+                func.concat_ws(
+                    " ",
+                    PersonName.prefix,
+                    PersonName.given_name,
+                    PersonName.middle_name,
+                    PersonName.family_name,
+                    PersonName.family_name2,
+                    PersonName.family_name_suffix,
+                )
+            )
+            .where(
+                and_(
+                    PersonName.person_id == Order.patient_id,
+                    PersonName.voided == False,  # noqa: E712
+                )
+            )
+            .order_by(
+                PersonName.preferred.desc(),
+                PersonName.date_created.desc(),
+                PersonName.person_name_id.desc(),
+            )
+            .limit(1)
+            .correlate(Order)
+            .scalar_subquery()
+        )
 
         query = (
             db.query(
@@ -563,29 +617,14 @@ class OrdersCRUD(BaseCRUD[Order]):
                 OrdererPerson.uuid.label("orderer_uuid"),
                 OrdererPerson.gender.label("orderer_gender"),
                 OrdererPerson.birthdate.label("orderer_birthdate"),
-                # Orderer name
-                OrdererPersonName.given_name.label("orderer_given_name"),
-                OrdererPersonName.family_name.label("orderer_family_name"),
-                OrdererPersonName.prefix.label("orderer_prefix"),
-                OrdererPersonName.middle_name.label("orderer_middle_name"),
-                OrdererPersonName.family_name2.label("orderer_family_name2"),
-                OrdererPersonName.family_name_suffix.label(
-                    "orderer_family_name_suffix"
-                ),
+                # Deterministic names
+                orderer_name_subquery.label("orderer_name"),
                 # Patient information
                 PatientPerson.person_id.label("patient_person_id"),
                 PatientPerson.uuid.label("patient_uuid"),
                 PatientPerson.gender.label("patient_gender"),
                 PatientPerson.birthdate.label("patient_birthdate"),
-                # Patient name
-                PatientPersonName.given_name.label("patient_given_name"),
-                PatientPersonName.family_name.label("patient_family_name"),
-                PatientPersonName.prefix.label("patient_prefix"),
-                PatientPersonName.middle_name.label("patient_middle_name"),
-                PatientPersonName.family_name2.label("patient_family_name2"),
-                PatientPersonName.family_name_suffix.label(
-                    "patient_family_name_suffix"
-                ),
+                patient_name_subquery.label("patient_name"),
                 # Concept information
                 Concept.concept_id.label("concept_id"),
                 Concept.uuid.label("concept_uuid"),
@@ -618,28 +657,12 @@ class OrdersCRUD(BaseCRUD[Order]):
                     OrdererPerson.voided == False,  # noqa: E712
                 ),
             )
-            .outerjoin(
-                OrdererPersonName,
-                and_(
-                    OrdererPersonName.person_id == Order.orderer,
-                    OrdererPersonName.preferred == True,  # noqa: E712
-                    OrdererPersonName.voided == False,  # noqa: E712
-                ),
-            )
             # Join for patient information
             .outerjoin(
                 PatientPerson,
                 and_(
                     PatientPerson.person_id == Order.patient_id,
                     PatientPerson.voided == False,  # noqa: E712
-                ),
-            )
-            .outerjoin(
-                PatientPersonName,
-                and_(
-                    PatientPersonName.person_id == Order.patient_id,
-                    PatientPersonName.preferred == True,  # noqa: E712
-                    PatientPersonName.voided == False,  # noqa: E712
                 ),
             )
             # Join for concept information
@@ -689,44 +712,8 @@ class OrdersCRUD(BaseCRUD[Order]):
         for row in results:
             order = row[0]  # The Order object is first in the tuple
 
-            # Build orderer name - prefer person name, fallback to provider name
-            orderer_name_parts = []
-            if row.orderer_prefix:
-                orderer_name_parts.append(row.orderer_prefix)
-            if row.orderer_given_name:
-                orderer_name_parts.append(row.orderer_given_name)
-            if row.orderer_middle_name:
-                orderer_name_parts.append(row.orderer_middle_name)
-            if row.orderer_family_name:
-                orderer_name_parts.append(row.orderer_family_name)
-            if row.orderer_family_name2:
-                orderer_name_parts.append(row.orderer_family_name2)
-            if row.orderer_family_name_suffix:
-                orderer_name_parts.append(row.orderer_family_name_suffix)
-
-            # Use person name if available, otherwise use provider name
-            if orderer_name_parts:
-                orderer_name = " ".join(orderer_name_parts)
-            elif row.provider_name:
-                orderer_name = row.provider_name
-            else:
-                orderer_name = None
-
-            # Build patient name
-            patient_name_parts = []
-            if row.patient_prefix:
-                patient_name_parts.append(row.patient_prefix)
-            if row.patient_given_name:
-                patient_name_parts.append(row.patient_given_name)
-            if row.patient_middle_name:
-                patient_name_parts.append(row.patient_middle_name)
-            if row.patient_family_name:
-                patient_name_parts.append(row.patient_family_name)
-            if row.patient_family_name2:
-                patient_name_parts.append(row.patient_family_name2)
-            if row.patient_family_name_suffix:
-                patient_name_parts.append(row.patient_family_name_suffix)
-            patient_name = " ".join(patient_name_parts) if patient_name_parts else None
+            orderer_name = row.orderer_name or row.provider_name
+            patient_name = row.patient_name
 
             # Create enriched order dictionary
             order_dict = {
@@ -860,17 +847,98 @@ class OrdersCRUD(BaseCRUD[Order]):
             Drug,
         )
 
-        # Create aliases for Person and PersonName tables to join them multiple times
+        # Create aliases for Person tables to join them multiple times
         OrdererPerson = aliased(Person)
-        OrdererPersonName = aliased(PersonName)
         PatientPerson = aliased(Person)
-        PatientPersonName = aliased(PersonName)
         CreatorPerson = aliased(Person)
-        CreatorPersonName = aliased(PersonName)
         # Create alias for SHORT concept name
         ShortConceptName = aliased(ConceptName)
         # Create alias for route concept name
         RouteConceptName = aliased(ConceptName)
+
+        orderer_name_subquery = (
+            select(
+                func.concat_ws(
+                    " ",
+                    PersonName.prefix,
+                    PersonName.given_name,
+                    PersonName.middle_name,
+                    PersonName.family_name,
+                    PersonName.family_name2,
+                    PersonName.family_name_suffix,
+                )
+            )
+            .where(
+                and_(
+                    PersonName.person_id == Provider.person_id,
+                    PersonName.voided == False,  # noqa: E712
+                )
+            )
+            .order_by(
+                PersonName.preferred.desc(),
+                PersonName.date_created.desc(),
+                PersonName.person_name_id.desc(),
+            )
+            .limit(1)
+            .correlate(Provider)
+            .scalar_subquery()
+        )
+
+        patient_name_subquery = (
+            select(
+                func.concat_ws(
+                    " ",
+                    PersonName.prefix,
+                    PersonName.given_name,
+                    PersonName.middle_name,
+                    PersonName.family_name,
+                    PersonName.family_name2,
+                    PersonName.family_name_suffix,
+                )
+            )
+            .where(
+                and_(
+                    PersonName.person_id == Order.patient_id,
+                    PersonName.voided == False,  # noqa: E712
+                )
+            )
+            .order_by(
+                PersonName.preferred.desc(),
+                PersonName.date_created.desc(),
+                PersonName.person_name_id.desc(),
+            )
+            .limit(1)
+            .correlate(Order)
+            .scalar_subquery()
+        )
+
+        creator_name_subquery = (
+            select(
+                func.concat_ws(
+                    " ",
+                    PersonName.prefix,
+                    PersonName.given_name,
+                    PersonName.middle_name,
+                    PersonName.family_name,
+                    PersonName.family_name2,
+                    PersonName.family_name_suffix,
+                )
+            )
+            .where(
+                and_(
+                    PersonName.person_id == Order.creator,
+                    PersonName.voided == False,  # noqa: E712
+                )
+            )
+            .order_by(
+                PersonName.preferred.desc(),
+                PersonName.date_created.desc(),
+                PersonName.person_name_id.desc(),
+            )
+            .limit(1)
+            .correlate(Order)
+            .scalar_subquery()
+        )
 
         try:
             # First, let's check if the visit exists
@@ -892,43 +960,19 @@ class OrdersCRUD(BaseCRUD[Order]):
                     OrdererPerson.uuid.label("orderer_uuid"),
                     OrdererPerson.gender.label("orderer_gender"),
                     OrdererPerson.birthdate.label("orderer_birthdate"),
-                    # Orderer name
-                    OrdererPersonName.given_name.label("orderer_given_name"),
-                    OrdererPersonName.family_name.label("orderer_family_name"),
-                    OrdererPersonName.prefix.label("orderer_prefix"),
-                    OrdererPersonName.middle_name.label("orderer_middle_name"),
-                    OrdererPersonName.family_name2.label("orderer_family_name2"),
-                    OrdererPersonName.family_name_suffix.label(
-                        "orderer_family_name_suffix"
-                    ),
+                    orderer_name_subquery.label("orderer_name"),
                     # Patient information
                     PatientPerson.person_id.label("patient_person_id"),
                     PatientPerson.uuid.label("patient_uuid"),
                     PatientPerson.gender.label("patient_gender"),
                     PatientPerson.birthdate.label("patient_birthdate"),
-                    # Patient name
-                    PatientPersonName.given_name.label("patient_given_name"),
-                    PatientPersonName.family_name.label("patient_family_name"),
-                    PatientPersonName.prefix.label("patient_prefix"),
-                    PatientPersonName.middle_name.label("patient_middle_name"),
-                    PatientPersonName.family_name2.label("patient_family_name2"),
-                    PatientPersonName.family_name_suffix.label(
-                        "patient_family_name_suffix"
-                    ),
+                    patient_name_subquery.label("patient_name"),
                     # Creator information
                     CreatorPerson.person_id.label("creator_person_id"),
                     CreatorPerson.uuid.label("creator_uuid"),
                     CreatorPerson.gender.label("creator_gender"),
                     CreatorPerson.birthdate.label("creator_birthdate"),
-                    # Creator name
-                    CreatorPersonName.given_name.label("creator_given_name"),
-                    CreatorPersonName.family_name.label("creator_family_name"),
-                    CreatorPersonName.prefix.label("creator_prefix"),
-                    CreatorPersonName.middle_name.label("creator_middle_name"),
-                    CreatorPersonName.family_name2.label("creator_family_name2"),
-                    CreatorPersonName.family_name_suffix.label(
-                        "creator_family_name_suffix"
-                    ),
+                    creator_name_subquery.label("creator_name"),
                     # Concept information
                     Concept.concept_id.label("concept_id"),
                     Concept.uuid.label("concept_uuid"),
@@ -978,14 +1022,6 @@ class OrdersCRUD(BaseCRUD[Order]):
                         OrdererPerson.voided == False,  # noqa: E712
                     ),
                 )
-                .outerjoin(
-                    OrdererPersonName,
-                    and_(
-                        OrdererPersonName.person_id == Order.orderer,
-                        OrdererPersonName.preferred == True,  # noqa: E712
-                        OrdererPersonName.voided == False,  # noqa: E712
-                    ),
-                )
                 # Join for patient information
                 .outerjoin(
                     PatientPerson,
@@ -994,28 +1030,12 @@ class OrdersCRUD(BaseCRUD[Order]):
                         PatientPerson.voided == False,  # noqa: E712
                     ),
                 )
-                .outerjoin(
-                    PatientPersonName,
-                    and_(
-                        PatientPersonName.person_id == Order.patient_id,
-                        PatientPersonName.preferred == True,  # noqa: E712
-                        PatientPersonName.voided == False,  # noqa: E712
-                    ),
-                )
                 # Join for creator information
                 .outerjoin(
                     CreatorPerson,
                     and_(
                         CreatorPerson.person_id == Order.creator,
                         CreatorPerson.voided == False,  # noqa: E712
-                    ),
-                )
-                .outerjoin(
-                    CreatorPersonName,
-                    and_(
-                        CreatorPersonName.person_id == Order.creator,
-                        CreatorPersonName.preferred == True,  # noqa: E712
-                        CreatorPersonName.voided == False,  # noqa: E712
                     ),
                 )
                 # Join for concept information
@@ -1079,64 +1099,9 @@ class OrdersCRUD(BaseCRUD[Order]):
             for row in results:
                 order = row[0]  # The Order object is first in the tuple
 
-                # Build orderer name - prefer person name, fallback to provider name
-                orderer_name_parts = []
-                if row.orderer_prefix:
-                    orderer_name_parts.append(row.orderer_prefix)
-                if row.orderer_given_name:
-                    orderer_name_parts.append(row.orderer_given_name)
-                if row.orderer_middle_name:
-                    orderer_name_parts.append(row.orderer_middle_name)
-                if row.orderer_family_name:
-                    orderer_name_parts.append(row.orderer_family_name)
-                if row.orderer_family_name2:
-                    orderer_name_parts.append(row.orderer_family_name2)
-                if row.orderer_family_name_suffix:
-                    orderer_name_parts.append(row.orderer_family_name_suffix)
-
-                # Use person name if available, otherwise use provider name
-                if orderer_name_parts:
-                    orderer_name = " ".join(orderer_name_parts)
-                elif row.provider_name:
-                    orderer_name = row.provider_name
-                else:
-                    orderer_name = None
-
-                # Build patient name
-                patient_name_parts = []
-                if row.patient_prefix:
-                    patient_name_parts.append(row.patient_prefix)
-                if row.patient_given_name:
-                    patient_name_parts.append(row.patient_given_name)
-                if row.patient_middle_name:
-                    patient_name_parts.append(row.patient_middle_name)
-                if row.patient_family_name:
-                    patient_name_parts.append(row.patient_family_name)
-                if row.patient_family_name2:
-                    patient_name_parts.append(row.patient_family_name2)
-                if row.patient_family_name_suffix:
-                    patient_name_parts.append(row.patient_family_name_suffix)
-                patient_name = (
-                    " ".join(patient_name_parts) if patient_name_parts else None
-                )
-
-                # Build creator name
-                creator_name_parts = []
-                if row.creator_prefix:
-                    creator_name_parts.append(row.creator_prefix)
-                if row.creator_given_name:
-                    creator_name_parts.append(row.creator_given_name)
-                if row.creator_middle_name:
-                    creator_name_parts.append(row.creator_middle_name)
-                if row.creator_family_name:
-                    creator_name_parts.append(row.creator_family_name)
-                if row.creator_family_name2:
-                    creator_name_parts.append(row.creator_family_name2)
-                if row.creator_family_name_suffix:
-                    creator_name_parts.append(row.creator_family_name_suffix)
-                creator_name = (
-                    " ".join(creator_name_parts) if creator_name_parts else None
-                )
+                orderer_name = row.orderer_name or row.provider_name
+                patient_name = row.patient_name
+                creator_name = row.creator_name
 
                 # Create enriched order dictionary
                 order_dict = {
