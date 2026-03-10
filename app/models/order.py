@@ -2,6 +2,8 @@
 Order model.
 """
 
+from typing import Optional
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -54,3 +56,58 @@ class Order(Base):
 
     # Relationship to Concept
     concept = relationship("Concept", back_populates="orders")
+
+    @property
+    def concept_uuid(self) -> Optional[str]:
+        """Expose concept UUID for response serialization."""
+        if not self.concept:
+            return None
+        return self.concept.uuid
+
+    @property
+    def concept_name(self) -> Optional[str]:
+        """Expose the preferred concept name for response serialization."""
+        if not self.concept:
+            return None
+        return self.concept.preferred_name
+
+    @property
+    def concept_info(self) -> Optional[dict]:
+        """Expose enriched concept details for response serialization."""
+        if not self.concept:
+            return None
+
+        concept_name = None
+        concept_name_locale = None
+        concept_name_locale_preferred = None
+        concept_name_type = None
+
+        for name in self.concept.names:
+            if not name.voided and (name.locale or "").lower() == "en":
+                concept_name = name.name
+                concept_name_locale = name.locale
+                concept_name_locale_preferred = name.locale_preferred
+                concept_name_type = name.concept_name_type
+                if name.concept_name_type == "FULLY_SPECIFIED":
+                    break
+
+        if concept_name is None:
+            for name in self.concept.names:
+                if not name.voided:
+                    concept_name = name.name
+                    concept_name_locale = name.locale
+                    concept_name_locale_preferred = name.locale_preferred
+                    concept_name_type = name.concept_name_type
+                    break
+
+        return {
+            "concept_id": self.concept.concept_id,
+            "uuid": self.concept.uuid,
+            "short_name": self.concept.short_name,
+            "description": self.concept.description,
+            "is_set": self.concept.is_set,
+            "name": concept_name or self.concept.short_name,
+            "name_locale": concept_name_locale,
+            "name_locale_preferred": concept_name_locale_preferred,
+            "name_type": concept_name_type,
+        }
