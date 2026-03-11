@@ -61,6 +61,7 @@ from .drug import (
 )
 from .drug_order import (
     DrugOrderInfo,
+    DrugOrderCreateForVisit,
     DrugInfo,
     DosingInstructions,
     ConceptNameInfo as DrugOrderConceptNameInfo,
@@ -200,6 +201,7 @@ __all__ = [
     "DrugUpdateResponse",
     # Drug Order
     "DrugOrderInfo",
+    "DrugOrderCreateForVisit",
     "DrugInfo",
     "DosingInstructions",
     "DrugOrderConceptNameInfo",

@@ -1,6 +1,7 @@
 import logging
 import uuid
 import secrets
+import json
 
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session, aliased
@@ -77,16 +78,14 @@ class OrdersCRUD(BaseCRUD[Order]):
         """
         return db.query(Order).filter(Order.order_number == order_number).first()
 
-    def create_for_visit_uuid(self, db: Session, visit_uuid: str, payload: Any) -> Order:
-        """
-        Create an order by visit UUID.
-
-        Behavior:
-        - Resolve visit by UUID
-        - Reuse existing unvoided encounter for that visit with encounter_type=1
-        - If none exists, create encounter_type=1 and use it
-        - Create order linked to that encounter
-        """
+    def _resolve_visit_and_encounter_for_order(
+        self,
+        db: Session,
+        visit_uuid: str,
+        creator: int,
+        encounter_datetime: Optional[datetime] = None,
+    ):
+        """Resolve visit and encounter_type=1 for visit-based order creation."""
         from app.models import Visit, Encounter
 
         visit = (
@@ -114,21 +113,60 @@ class OrdersCRUD(BaseCRUD[Order]):
             .first()
         )
 
+        if not encounter:
+            encounter = Encounter(
+                encounter_type=1,
+                patient_id=visit.patient_id,
+                location_id=visit.location_id,
+                encounter_datetime=encounter_datetime or now,
+                creator=creator,
+                date_created=now,
+                voided=False,
+                visit_id=visit.visit_id,
+                uuid=str(uuid.uuid4()),
+            )
+            db.add(encounter)
+            db.flush()
+
+        return visit, encounter, now
+
+    def get_drug_order_by_order_id(self, db: Session, order_id: int) -> Optional[Dict[str, Any]]:
+        """Get a single drug order with enrichment by order ID."""
+        from app.sql.orders_sql import get_drug_orders_with_enrichment_sql
+        from app.sql.sql_utils import process_drug_order_query_results
+
+        raw_sql = get_drug_orders_with_enrichment_sql()
+        result = execute_enriched_orders_query(
+            db,
+            raw_sql,
+            {
+                "order_id": order_id,
+                "order_type_id": 2,
+                "voided": False,
+            },
+            0,
+            1,
+        )
+        orders = process_drug_order_query_results(result)
+        return orders[0] if orders else None
+
+    def create_for_visit_uuid(self, db: Session, visit_uuid: str, payload: Any) -> Order:
+        """
+        Create an order by visit UUID.
+
+        Behavior:
+        - Resolve visit by UUID
+        - Reuse existing unvoided encounter for that visit with encounter_type=1
+        - If none exists, create encounter_type=1 and use it
+        - Create order linked to that encounter
+        """
         try:
-            if not encounter:
-                encounter = Encounter(
-                    encounter_type=1,
-                    patient_id=visit.patient_id,
-                    location_id=visit.location_id,
-                    encounter_datetime=payload.date_activated or now,
-                    creator=payload.creator,
-                    date_created=now,
-                    voided=False,
-                    visit_id=visit.visit_id,
-                    uuid=str(uuid.uuid4()),
-                )
-                db.add(encounter)
-                db.flush()
+            visit, encounter, now = self._resolve_visit_and_encounter_for_order(
+                db=db,
+                visit_uuid=visit_uuid,
+                creator=payload.creator,
+                encounter_datetime=payload.date_activated,
+            )
 
             obj_data = payload.dict(exclude_unset=True)
             obj_data["encounter_id"] = encounter.encounter_id
@@ -146,6 +184,96 @@ class OrdersCRUD(BaseCRUD[Order]):
             db_order = Order(**obj_data)
             db.add(db_order)
             db.commit()
+            db.refresh(db_order)
+            return db_order
+        except Exception:
+            db.rollback()
+            raise
+
+    def create_drug_order_for_visit_uuid(
+        self, db: Session, visit_uuid: str, payload: Any
+    ) -> Dict[str, Any]:
+        """
+        Create a drug order by visit UUID.
+
+        Creates a row in orders with order_type_id=2, then creates the
+        corresponding one-to-one row in drug_order using the same order_id.
+        """
+        from app.models import DrugOrder
+
+        drug_order_fields = {
+            "drug_inventory_id",
+            "dose",
+            "as_needed",
+            "dosing_type",
+            "quantity",
+            "as_needed_condition",
+            "num_refills",
+            "dosing_instructions",
+            "duration",
+            "duration_units",
+            "quantity_units",
+            "route",
+            "dose_units",
+            "frequency",
+            "brand_name",
+            "dispense_as_written",
+            "drug_non_coded",
+        }
+
+        try:
+            visit, encounter, now = self._resolve_visit_and_encounter_for_order(
+                db=db,
+                visit_uuid=visit_uuid,
+                creator=payload.creator,
+                encounter_datetime=payload.date_activated,
+            )
+
+            payload_data = payload.dict(exclude_unset=True)
+            order_data = {
+                key: value
+                for key, value in payload_data.items()
+                if key not in drug_order_fields
+            }
+            order_data["order_type_id"] = 2
+            order_data["encounter_id"] = encounter.encounter_id
+            order_data["patient_id"] = visit.patient_id
+            order_data["uuid"] = str(uuid.uuid4())
+            order_data["date_created"] = now
+
+            if not order_data.get("date_activated"):
+                order_data["date_activated"] = now
+            if not order_data.get("order_number"):
+                order_data["order_number"] = self._generate_order_number(db)
+
+            self._set_default_values(order_data)
+
+            db_order = Order(**order_data)
+            db.add(db_order)
+            db.flush()
+
+            drug_order_data = {
+                key: value
+                for key, value in payload_data.items()
+                if key in drug_order_fields
+            }
+            if isinstance(drug_order_data.get("dosing_instructions"), dict):
+                drug_order_data["dosing_instructions"] = json.dumps(
+                    drug_order_data["dosing_instructions"]
+                )
+
+            db.add(
+                DrugOrder(
+                    order_id=db_order.order_id,
+                    **drug_order_data,
+                )
+            )
+            db.commit()
+
+            enriched_order = self.get_drug_order_by_order_id(db, db_order.order_id)
+            if enriched_order:
+                return enriched_order
+
             db.refresh(db_order)
             return db_order
         except Exception:

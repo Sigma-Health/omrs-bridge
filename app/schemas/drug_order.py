@@ -3,7 +3,9 @@ DrugOrder schemas.
 """
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any, Dict
+
+from .order import OrderBase
 
 
 class ConceptNameInfo(BaseModel):
@@ -62,3 +64,29 @@ class DrugOrderInfo(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DrugOrderCreateForVisit(OrderBase):
+    """Schema for creating a drug order using a visit UUID."""
+
+    concept_id: int
+    orderer: int
+    creator: int
+    care_setting: int
+    drug_inventory_id: int
+    dose: Optional[float] = None
+    as_needed: Optional[bool] = False
+    dosing_type: Optional[str] = None
+    quantity: Optional[float] = None
+    as_needed_condition: Optional[str] = None
+    num_refills: Optional[int] = 0
+    dosing_instructions: Optional[Dict[str, Any]] = None
+    duration: Optional[int] = None
+    duration_units: Optional[int] = None
+    quantity_units: Optional[int] = None
+    route: Optional[int] = None
+    dose_units: Optional[int] = None
+    frequency: Optional[int] = None
+    brand_name: Optional[str] = None
+    dispense_as_written: Optional[bool] = False
+    drug_non_coded: Optional[str] = None
