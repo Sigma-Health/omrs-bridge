@@ -783,8 +783,11 @@ async def update_order_partial_by_uuid(
         )
 
         return OrderUpdateResponse(
-            order=updated_order,
+            success=True,
+            message="Order updated successfully",
+            order_id=updated_order.order_id,
             updated_fields=updated_fields,
+            order=updated_order,
         )
     except Exception as e:
         raise HTTPException(
@@ -877,8 +880,6 @@ async def update_order_full_by_uuid(
             status_code=400,
             detail=f"Failed to update order: {str(e)}",
         )
-
-
 @router.post("/{order_id}/void", response_model=OrderResponse)
 async def void_order(
     order_id: int,
