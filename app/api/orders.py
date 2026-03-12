@@ -789,7 +789,11 @@ async def update_order_partial_by_uuid(
             updated_fields=["fulfiller_status"],
             order=updated_order,
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Error updating order UUID {uuid}: {str(e)}")
+        logger.error(f"Order update data: {order_update.dict()}")
         raise HTTPException(
             status_code=400,
             detail=f"Failed to update order: {str(e)}",
