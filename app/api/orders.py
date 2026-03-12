@@ -786,7 +786,7 @@ async def update_order_partial_by_uuid(
             success=True,
             message="Order updated successfully",
             order_id=updated_order.order_id,
-            updated_fields=updated_fields,
+            updated_fields=["fulfiller_status"],
             order=updated_order,
         )
     except Exception as e:
