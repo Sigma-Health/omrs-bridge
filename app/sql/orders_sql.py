@@ -504,7 +504,7 @@ def get_single_order_with_expansion_sql() -> str:
         ca.sort_weight AS concept_answer_sort_weight,
         answer_concept.concept_id AS answer_concept_id,
         answer_concept.uuid AS answer_concept_uuid,
-        answer_concept.short_name AS answer_concept_short_name,
+        COALESCE(answer_short_cn.name, answer_concept.short_name) AS answer_concept_short_name,
         answer_concept.description AS answer_concept_description,
         answer_concept.is_set AS answer_concept_is_set,
         
@@ -517,7 +517,7 @@ def get_single_order_with_expansion_sql() -> str:
         -- Set members (if is_set=true) - concept definitions that are members of this panel
         sm_concept.concept_id AS set_member_concept_id,
         sm_concept.uuid AS set_member_concept_uuid,
-        sm_concept.short_name AS set_member_concept_short_name,
+        COALESCE(sm_short_cn.name, sm_concept.short_name) AS set_member_concept_short_name,
         sm_concept.description AS set_member_concept_description,
         sm_concept.is_set AS set_member_concept_is_set,
         
@@ -544,7 +544,7 @@ def get_single_order_with_expansion_sql() -> str:
         sm_ca.sort_weight AS set_member_concept_answer_sort_weight,
         sm_answer_concept.concept_id AS set_member_answer_concept_id,
         sm_answer_concept.uuid AS set_member_answer_concept_uuid,
-        sm_answer_concept.short_name AS set_member_answer_concept_short_name,
+        COALESCE(sm_answer_short_cn.name, sm_answer_concept.short_name) AS set_member_answer_concept_short_name,
         sm_answer_concept.description AS set_member_answer_concept_description,
         sm_answer_concept.is_set AS set_member_answer_concept_is_set,
         
@@ -557,7 +557,7 @@ def get_single_order_with_expansion_sql() -> str:
         -- Parent concept metadata (if is_set=false) - metadata about the parent concept
         parent_concept.concept_id AS parent_concept_id,
         parent_concept.uuid AS parent_concept_uuid,
-        parent_concept.short_name AS parent_concept_short_name,
+        COALESCE(parent_short_cn.name, parent_concept.short_name) AS parent_concept_short_name,
         parent_concept.description AS parent_concept_description,
         parent_concept.is_set AS parent_concept_is_set,
         
@@ -665,6 +665,13 @@ def get_single_order_with_expansion_sql() -> str:
         AND answer_cn.voided = false
     )
 
+    LEFT OUTER JOIN concept_name answer_short_cn ON (
+        answer_short_cn.concept_id = answer_concept.concept_id
+        AND answer_short_cn.locale = 'en'
+        AND answer_short_cn.concept_name_type = 'SHORT'
+        AND answer_short_cn.voided = false
+    )
+
     -- Join for set members (if is_set=true) - concept definitions that are members of this panel
     LEFT OUTER JOIN concept_set cs ON (
         cs.concept_set = c.concept_id
@@ -681,6 +688,13 @@ def get_single_order_with_expansion_sql() -> str:
         AND sm_cn.locale = 'en'
         AND sm_cn.concept_name_type = 'FULLY_SPECIFIED'
         AND sm_cn.voided = false
+    )
+
+    LEFT OUTER JOIN concept_name sm_short_cn ON (
+        sm_short_cn.concept_id = sm_concept.concept_id
+        AND sm_short_cn.locale = 'en'
+        AND sm_short_cn.concept_name_type = 'SHORT'
+        AND sm_short_cn.voided = false
     )
     
     LEFT OUTER JOIN concept_datatype sm_cdt ON (
@@ -709,6 +723,13 @@ def get_single_order_with_expansion_sql() -> str:
         AND sm_answer_cn.voided = false
     )
 
+    LEFT OUTER JOIN concept_name sm_answer_short_cn ON (
+        sm_answer_short_cn.concept_id = sm_answer_concept.concept_id
+        AND sm_answer_short_cn.locale = 'en'
+        AND sm_answer_short_cn.concept_name_type = 'SHORT'
+        AND sm_answer_short_cn.voided = false
+    )
+
     -- Join for parent concept metadata (if is_set=false) - metadata about the parent concept
     LEFT OUTER JOIN concept_set parent_cs ON (
         parent_cs.concept_id = c.concept_id
@@ -725,6 +746,13 @@ def get_single_order_with_expansion_sql() -> str:
         AND parent_cn.locale = 'en'
         AND parent_cn.concept_name_type = 'FULLY_SPECIFIED'
         AND parent_cn.voided = false
+    )
+
+    LEFT OUTER JOIN concept_name parent_short_cn ON (
+        parent_short_cn.concept_id = parent_concept.concept_id
+        AND parent_short_cn.locale = 'en'
+        AND parent_short_cn.concept_name_type = 'SHORT'
+        AND parent_short_cn.voided = false
     )
     
     LEFT OUTER JOIN concept_datatype parent_cdt ON (
