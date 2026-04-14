@@ -10,6 +10,7 @@ from datetime import datetime
 from app.database import get_db
 from app.auth import get_current_api_key
 from app.crud import vitals, observations
+from app.crud.vitals import VitalsError
 from app.schemas import (
     VitalsResponse,
     VisitVitals,
@@ -20,6 +21,8 @@ from app.schemas import (
     VitalReplace,
     VitalUpdateResponse,
     VitalSign,
+    VisitVitalCreate,
+    VisitVitalCreateResponse,
 )
 from app.models import Obs
 from app.utils import validate_uuid
@@ -243,6 +246,62 @@ async def get_vitals_grouped_by_type_uuid(
         raise HTTPException(
             status_code=400,
             detail=f"Failed to get grouped vitals for visit UUID {visit_uuid}: {str(e)}",
+        )
+
+
+@router.post("/visit/{visit_id}", response_model=VisitVitalCreateResponse)
+async def create_vitals_for_visit_id(
+    payload: VisitVitalCreate,
+    visit_id: int = Path(..., description="Visit ID"),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Save one or more vital signs for a visit by visit ID.
+
+    Resolves the visit, reuses or creates the configured consultation encounter,
+    then stores each vital sign as an observation.
+    """
+    try:
+        return vitals.create_vitals_for_visit(db=db, visit_id=visit_id, payload=payload)
+    except VitalsError as e:
+        raise HTTPException(status_code=e.status, detail=e.code)
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to create vitals for visit {visit_id}: {str(e)}",
+        )
+
+
+@router.post("/visit/uuid/{visit_uuid}", response_model=VisitVitalCreateResponse)
+async def create_vitals_for_visit_uuid(
+    payload: VisitVitalCreate,
+    visit_uuid: str = Path(..., description="Visit UUID"),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Save one or more vital signs for a visit by visit UUID.
+
+    Resolves the visit, reuses or creates the configured consultation encounter,
+    then stores each vital sign as an observation.
+    """
+    if not validate_uuid(visit_uuid):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid visit UUID format",
+        )
+
+    try:
+        return vitals.create_vitals_for_visit(
+            db=db, visit_uuid=visit_uuid, payload=payload
+        )
+    except VitalsError as e:
+        raise HTTPException(status_code=e.status, detail=e.code)
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to create vitals for visit UUID {visit_uuid}: {str(e)}",
         )
 
 
