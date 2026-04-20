@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_api_key
 from app.crud import orders
 from app.database import get_db
-from app.schemas import DrugOrderCreateForVisit, OrderResponse
+from app.schemas import DrugOrderCreateForVisit, OrderResponse, OrderVoidRequest
 from app.utils import validate_uuid
 
 router = APIRouter(tags=["drug-orders"])
@@ -82,4 +82,71 @@ async def create_drug_order_for_visit_uuid(
         raise HTTPException(
             status_code=400,
             detail=f"Failed to create drug order for visit UUID: {str(e)}",
+        )
+
+
+@router.post("/{order_id}/void", response_model=OrderResponse)
+async def void_drug_order(
+    order_id: int,
+    payload: OrderVoidRequest,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """Void a drug order when the linked visit is active."""
+    try:
+        voided_order = orders.void_order(
+            db,
+            order_id,
+            payload.voided_by,
+            payload.reason,
+            force=False,
+        )
+        if not voided_order:
+            raise HTTPException(
+                status_code=404,
+                detail="Drug order not found",
+            )
+        return voided_order
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to void drug order: {str(e)}",
+        )
+
+
+@router.post("/{order_id}/void/force", response_model=OrderResponse)
+async def force_void_drug_order(
+    order_id: int,
+    payload: OrderVoidRequest,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """Force void a drug order, bypassing visit active-status checks."""
+    try:
+        voided_order = orders.void_order(
+            db,
+            order_id,
+            payload.voided_by,
+            payload.reason,
+            force=True,
+        )
+        if not voided_order:
+            raise HTTPException(
+                status_code=404,
+                detail="Drug order not found",
+            )
+        return voided_order
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to force void drug order: {str(e)}",
         )

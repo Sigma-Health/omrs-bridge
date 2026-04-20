@@ -2,7 +2,7 @@
 Vitals schemas for API responses.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -117,6 +117,70 @@ class VitalCreate(BaseModel):
     interpretation: Optional[str] = None
     value_modifier: Optional[str] = None
     form_namespace_and_path: Optional[str] = None
+
+
+class VitalMeasurementCreate(BaseModel):
+    """A single vital sign observation to record for a visit"""
+
+    concept_id: int
+    value_numeric: Optional[float] = None
+    value_text: Optional[str] = None
+    value_coded: Optional[int] = None
+    value_datetime: Optional[datetime] = None
+    obs_datetime: Optional[datetime] = None
+    location_id: Optional[int] = None
+    obs_group_id: Optional[int] = None
+    order_id: Optional[int] = None
+    comments: Optional[str] = None
+    status: Optional[str] = "FINAL"
+    interpretation: Optional[str] = None
+    value_modifier: Optional[str] = None
+    form_namespace_and_path: Optional[str] = None
+
+    @model_validator(mode="after")
+    def require_value(self) -> "VitalMeasurementCreate":
+        if not any(
+            [
+                self.value_numeric is not None,
+                self.value_text is not None,
+                self.value_coded is not None,
+                self.value_datetime is not None,
+            ]
+        ):
+            raise ValueError(
+                "At least one value field (value_numeric, value_text, value_coded, or value_datetime) must be provided"
+            )
+        return self
+
+
+class VisitVitalCreate(BaseModel):
+    """Request body for saving vital signs against a visit"""
+
+    creator: int
+    location_id: Optional[int] = None
+    provider_id: Optional[int] = None
+    encounter_role_id: Optional[int] = 1
+    vitals: List[VitalMeasurementCreate]
+
+    @field_validator("vitals")
+    @classmethod
+    def vitals_must_not_be_empty(
+        cls, v: List[VitalMeasurementCreate]
+    ) -> List[VitalMeasurementCreate]:
+        if not v:
+            raise ValueError("vitals must contain at least one entry")
+        return v
+
+
+class VisitVitalCreateResponse(BaseModel):
+    """Response after saving visit vital signs"""
+
+    encounter_id: int
+    encounter_uuid: str
+    visit_id: int
+    visit_uuid: str
+    created: bool
+    vitals: List[VitalSign]
 
 
 class VitalUpdate(BaseModel):
