@@ -591,7 +591,8 @@ class VisitsCRUD(BaseCRUD[Visit]):
             query = query.filter(or_(*search_conditions))
 
         results = (
-            query.order_by(self.model.date_started.desc())
+            query.distinct()  # Ensure unique visits (one visit can have multiple orders)
+            .order_by(self.model.date_started.desc())
             .offset(skip)
             .limit(limit)
             .all()
