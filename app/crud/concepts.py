@@ -112,6 +112,72 @@ class ConceptsCRUD(BaseCRUD[Concept]):
         """
         return self.get_by_name(db, short_name, locale=locale)
 
+    def assign_concept_to_concept_set(
+        self,
+        db: Session,
+        concept_set_id: int,
+        concept_uuid: str,
+        creator: int = 1,
+    ) -> dict:
+        """
+        Assign a concept to a concept set.
+
+        Args:
+            db: Database session
+            concept_set_id: ID of the concept set to add the member to
+            concept_uuid: UUID of the concept to add as a member
+            creator: Creator ID for the concept set member
+
+        Returns:
+            Dictionary with assignment details
+
+        Raises:
+            ValueError: If concept not found with the given UUID
+            ValueError: If concept is already a member of the concept set
+        """
+        from app.models import ConceptSet, Concept
+        import uuid as uuid_lib
+
+        # Get the concept by UUID
+        concept = db.query(Concept).filter(Concept.uuid == concept_uuid).first()
+        if not concept:
+            raise ValueError(f"Concept not found with UUID: {concept_uuid}")
+
+        # Check if the concept is already a member of the concept set
+        existing = db.query(ConceptSet).filter(
+            ConceptSet.concept_set == concept_set_id,
+            ConceptSet.concept_id == concept.concept_id
+        ).first()
+
+        if existing:
+            raise ValueError(
+                f"Concept {concept_uuid} is already a member of concept set {concept_set_id}"
+            )
+
+        # Create the concept set member
+        concept_set_member = ConceptSet(
+            concept_set=concept_set_id,
+            concept_id=concept.concept_id,
+            creator=creator,
+            date_created=datetime.utcnow(),
+            uuid=str(uuid_lib.uuid4()),
+        )
+
+        try:
+            db.add(concept_set_member)
+            db.commit()
+            db.refresh(concept_set_member)
+
+            return {
+                "concept_set_id": concept_set_id,
+                "concept_id": concept.concept_id,
+                "concept_uuid": concept_uuid,
+                "concept_set_member_id": concept_set_member.concept_set_id,
+            }
+        except Exception as e:
+            db.rollback()
+            raise e
+
     def get_by_description(
         self, db: Session, description: str, locale: Optional[str] = None
     ) -> Optional[Concept]:
