@@ -2,6 +2,7 @@ from typing import List, Optional, Any
 from sqlalchemy.orm import Session, selectinload, with_loader_criteria
 from sqlalchemy import and_, or_, func, text
 from datetime import datetime
+import uuid as uuid_lib
 
 from .base import BaseCRUD
 
@@ -19,6 +20,84 @@ class ConceptsCRUD(BaseCRUD[Concept]):
     def __init__(self):
         """Initialize with the Concept model."""
         super().__init__(Concept)
+
+    def create(self, db: Session, obj_create: Any) -> Concept:
+        """
+        Create a new concept with its associated concept names.
+
+        This overrides the base create method to also create:
+        - A FULLY_SPECIFIED name (from short_name or description)
+        - A SHORT name (from short_name)
+
+        Args:
+            db: Database session
+            obj_create: Pydantic schema for creating the concept
+
+        Returns:
+            The created Concept with names
+        """
+        # Generate UUID for new concept
+        concept_uuid = str(uuid_lib.uuid4())
+
+        # Create concept data
+        obj_data = obj_create.dict()
+        obj_data["uuid"] = concept_uuid
+        obj_data["date_created"] = datetime.utcnow()
+
+        # Set default values
+        self._set_default_values(obj_data)
+
+        # Create the concept
+        concept = Concept(**obj_data)
+
+        try:
+            db.add(concept)
+            db.flush()  # Flush to get the concept_id
+
+            # Now create concept names
+            creator = obj_data.get("creator", 1)
+            short_name = obj_data.get("short_name", "")
+            description = obj_data.get("description", "")
+
+            # Use short_name as the primary name source
+            name_value = short_name or description or "Unnamed Concept"
+
+            # Create FULLY_SPECIFIED name
+            fully_specified_name = ConceptName(
+                concept_id=concept.concept_id,
+                name=name_value,
+                locale="en",  # Default to English
+                locale_preferred=True,
+                concept_name_type="FULLY_SPECIFIED",
+                creator=creator,
+                date_created=datetime.utcnow(),
+                uuid=str(uuid_lib.uuid4()),
+                voided=False,
+            )
+            db.add(fully_specified_name)
+
+            # Create SHORT name if short_name is provided
+            if short_name:
+                short_name_entry = ConceptName(
+                    concept_id=concept.concept_id,
+                    name=short_name,
+                    locale="en",
+                    locale_preferred=False,
+                    concept_name_type="SHORT",
+                    creator=creator,
+                    date_created=datetime.utcnow(),
+                    uuid=str(uuid_lib.uuid4()),
+                    voided=False,
+                )
+                db.add(short_name_entry)
+
+            db.commit()
+            db.refresh(concept)
+            return concept
+
+        except Exception as e:
+            db.rollback()
+            raise e
 
     def _query_with_names(self, db: Session, locale: Optional[str] = None):
         """Return base concept query with concept names eagerly loaded.
