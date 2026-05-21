@@ -13,6 +13,8 @@ from .concept import (
     ConceptResponse,
     ConceptUpdateResponse,
     ConceptNameResponse,
+    ConceptSetAssignRequest,
+    ConceptSetAssignResponse,
 )
 from .diagnosis import (
     DiagnosisObservation,

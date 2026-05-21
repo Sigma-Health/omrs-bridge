@@ -19,6 +19,8 @@ from app.schemas import (
     ConceptReplace,
     ConceptResponse,
     ConceptUpdateResponse,
+    ConceptSetAssignRequest,
+    ConceptSetAssignResponse,
 )
 from app.utils import validate_uuid
 
@@ -423,6 +425,46 @@ async def update_concept_partial(
         raise HTTPException(
             status_code=400,
             detail=f"Failed to update concept {str(e)}",
+        )
+
+
+@router.post("/concept-set/assign", response_model=ConceptSetAssignResponse)
+async def assign_concept_to_concept_set(
+    assign_request: ConceptSetAssignRequest,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Assign a concept to a concept set.
+
+    Receives a concept set ID and a concept UUID, looks up the concept by UUID,
+    and adds it as a member to the concept set.
+    """
+    try:
+        result = concepts.assign_concept_to_concept_set(
+            db,
+            concept_set_id=assign_request.concept_set_id,
+            concept_uuid=assign_request.concept_uuid,
+            creator=assign_request.creator,
+        )
+
+        return ConceptSetAssignResponse(
+            success=True,
+            message="Concept successfully assigned to concept set",
+            concept_set_id=result["concept_set_id"],
+            concept_id=result["concept_id"],
+            concept_uuid=result["concept_uuid"],
+            concept_set_member_id=result["concept_set_member_id"],
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to assign concept to concept set: {str(e)}",
         )
 
 

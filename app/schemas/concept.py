@@ -100,3 +100,22 @@ class ConceptUpdateResponse(BaseModel):
     updated_fields: list[str]
     concept: Optional[ConceptResponse] = None
     search_index_update_status: Optional[str] = None
+
+
+class ConceptSetAssignRequest(BaseModel):
+    """Schema for assigning a concept to a concept set"""
+
+    concept_set_id: int = Field(..., description="ID of the concept set to add the member to")
+    concept_uuid: str = Field(..., description="UUID of the concept to add as a member")
+    creator: int = Field(default=1, description="Creator ID for the concept set member")
+
+
+class ConceptSetAssignResponse(BaseModel):
+    """Schema for concept set assignment response"""
+
+    success: bool
+    message: str
+    concept_set_id: int
+    concept_id: int
+    concept_uuid: str
+    concept_set_member_id: int
