@@ -1810,6 +1810,132 @@ class OrdersCRUD(BaseCRUD[Order]):
             "parent_concept": None,  # TODO: implement if needed
         }
 
+    def get_lab_daily_concept_summary(
+        self,
+        db: Session,
+        start_date: str,
+        end_date: str,
+        location_id: Optional[int] = None,
+        order_type_id: int = 4,
+    ) -> Dict[str, Any]:
+        """
+        Aggregate lab orders by calendar day and concept for a date range.
+
+        Joins Order -> Encounter -> Visit so clinic filtering uses Visit.location_id.
+        """
+        from collections import defaultdict
+        from datetime import datetime as dt
+
+        from app.models import Concept, ConceptName, Encounter, Visit
+
+        try:
+            start = dt.strptime(start_date, "%Y-%m-%d").date()
+            end = dt.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise ValueError("start_date and end_date must be YYYY-MM-DD") from exc
+
+        if end < start:
+            raise ValueError("end_date must be on or after start_date")
+
+        order_date_col = func.date(Order.date_activated)
+
+        query = (
+            db.query(
+                order_date_col.label("order_date"),
+                Order.concept_id,
+                func.count(Order.order_id).label("order_count"),
+            )
+            .join(Encounter, Order.encounter_id == Encounter.encounter_id)
+            .join(Visit, Encounter.visit_id == Visit.visit_id)
+            .filter(
+                and_(
+                    Order.order_type_id == order_type_id,
+                    Order.voided == False,  # noqa: E712
+                    order_date_col >= start,
+                    order_date_col <= end,
+                )
+            )
+        )
+
+        if location_id is not None:
+            query = query.filter(Visit.location_id == location_id)
+
+        rows = (
+            query.group_by(order_date_col, Order.concept_id)
+            .order_by(order_date_col.asc(), Order.concept_id.asc())
+            .all()
+        )
+
+        concept_ids = {row.concept_id for row in rows if row.concept_id is not None}
+        concept_names: Dict[int, str] = {}
+
+        if concept_ids:
+            concepts = (
+                db.query(Concept)
+                .filter(Concept.concept_id.in_(concept_ids))
+                .all()
+            )
+            for concept in concepts:
+                concept_names[concept.concept_id] = (
+                    concept.preferred_name or concept.short_name or f"Concept {concept.concept_id}"
+                )
+
+            missing_ids = concept_ids - set(concept_names.keys())
+            if missing_ids:
+                name_rows = (
+                    db.query(ConceptName)
+                    .filter(
+                        ConceptName.concept_id.in_(missing_ids),
+                        ConceptName.voided == False,  # noqa: E712
+                    )
+                    .order_by(
+                        ConceptName.locale_preferred.desc(),
+                        ConceptName.concept_name_id.asc(),
+                    )
+                    .all()
+                )
+                for name_row in name_rows:
+                    if name_row.concept_id not in concept_names:
+                        concept_names[name_row.concept_id] = name_row.name
+
+        by_day: Dict[str, list] = defaultdict(list)
+        for row in rows:
+            order_date = row.order_date
+            if hasattr(order_date, "isoformat"):
+                date_str = order_date.isoformat()
+            else:
+                date_str = str(order_date)
+
+            concept_id = row.concept_id
+            concept_name = concept_names.get(
+                concept_id,
+                f"Concept {concept_id}" if concept_id is not None else "Unknown",
+            )
+            by_day[date_str].append(
+                {
+                    "concept_name": concept_name,
+                    "order_count": int(row.order_count),
+                }
+            )
+
+        days = []
+        for date_str in sorted(by_day.keys()):
+            concepts = sorted(by_day[date_str], key=lambda c: c["concept_name"].lower())
+            sample_date = dt.strptime(date_str, "%Y-%m-%d").date()
+            days.append(
+                {
+                    "date": date_str,
+                    "display_date": f"{sample_date.day} {sample_date.strftime('%B %Y')}",
+                    "concepts": concepts,
+                }
+            )
+
+        return {
+            "start_date": start_date,
+            "end_date": end_date,
+            "days": days,
+        }
+
 
 # Create instance
 orders_crud = OrdersCRUD()

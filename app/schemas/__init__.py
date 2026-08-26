@@ -148,6 +148,11 @@ from .lab import (
     LabCatalogMember,
     LabCatalogResponse,
 )
+from .lab_order_summary import (
+    ConceptOrderCount,
+    DailyConceptOrders,
+    LabDailyConceptSummaryResponse,
+)
 
 __all__ = [
     # Base
@@ -280,4 +285,8 @@ __all__ = [
     # Lab
     "LabCatalogMember",
     "LabCatalogResponse",
+    # Lab order daily summary
+    "ConceptOrderCount",
+    "DailyConceptOrders",
+    "LabDailyConceptSummaryResponse",
 ]

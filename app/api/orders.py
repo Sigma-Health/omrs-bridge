@@ -11,6 +11,8 @@ from typing import List, Optional
 from app.database import get_db
 from app.auth import get_current_api_key
 from app.crud import orders
+from datetime import datetime
+
 from app.schemas import (
     OrderUpdate,
     OrderReplace,
@@ -20,12 +22,70 @@ from app.schemas import (
     OrderUpdateResponse,
     OrderConceptDetailsResponse,
     OpenMRSOrderResponse,
+    LabDailyConceptSummaryResponse,
 )
 from app.utils import validate_uuid
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["orders"])
+
+LAB_ORDER_TYPE_ID = 4
+
+
+@router.get(
+    "/lab/daily-concept-summary",
+    response_model=LabDailyConceptSummaryResponse,
+    summary="Lab order counts by day and concept",
+    description=(
+        "Aggregate non-voided lab orders (order_type_id=4) by calendar day and "
+        "concept name for a date range. Optional location_id filters by visit location."
+    ),
+)
+async def get_lab_daily_concept_summary(
+    start_date: str = Query(
+        ...,
+        description="Start date (YYYY-MM-DD), inclusive",
+        example="2026-08-01",
+    ),
+    end_date: str = Query(
+        ...,
+        description="End date (YYYY-MM-DD), inclusive",
+        example="2026-08-31",
+    ),
+    location_id: Optional[int] = Query(
+        None,
+        description="OpenMRS visit location_id (clinic). Omit for all locations.",
+    ),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """Return lab order counts grouped by day and concept."""
+    for label, value in (("start_date", start_date), ("end_date", end_date)):
+        try:
+            datetime.strptime(value, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{label} must be in YYYY-MM-DD format",
+            )
+
+    try:
+        return orders.get_lab_daily_concept_summary(
+            db=db,
+            start_date=start_date,
+            end_date=end_date,
+            location_id=location_id,
+            order_type_id=LAB_ORDER_TYPE_ID,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Failed to build lab daily concept summary")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get lab daily concept summary: {str(e)}",
+        )
 
 
 @router.post("/", response_model=OrderResponse)
