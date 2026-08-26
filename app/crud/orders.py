@@ -1870,33 +1870,58 @@ class OrdersCRUD(BaseCRUD[Order]):
         concept_names: Dict[int, str] = {}
 
         if concept_ids:
-            concepts = (
-                db.query(Concept)
-                .filter(Concept.concept_id.in_(concept_ids))
+            # Prefer English names, matching other order endpoints
+            name_rows = (
+                db.query(ConceptName)
+                .filter(
+                    ConceptName.concept_id.in_(concept_ids),
+                    ConceptName.voided == False,  # noqa: E712
+                    ConceptName.locale == "en",
+                )
                 .all()
             )
-            for concept in concepts:
-                concept_names[concept.concept_id] = (
-                    concept.preferred_name or concept.short_name or f"Concept {concept.concept_id}"
+
+            names_by_concept: Dict[int, list] = defaultdict(list)
+            for name_row in name_rows:
+                names_by_concept[name_row.concept_id].append(name_row)
+
+            for concept_id, names in names_by_concept.items():
+                fully_specified = next(
+                    (
+                        n.name
+                        for n in names
+                        if (n.concept_name_type or "").upper() == "FULLY_SPECIFIED"
+                        and n.name
+                    ),
+                    None,
                 )
+                if fully_specified:
+                    concept_names[concept_id] = fully_specified
+                    continue
+
+                preferred = next(
+                    (n.name for n in names if n.locale_preferred and n.name),
+                    None,
+                )
+                if preferred:
+                    concept_names[concept_id] = preferred
+                    continue
+
+                any_en = next((n.name for n in names if n.name), None)
+                if any_en:
+                    concept_names[concept_id] = any_en
 
             missing_ids = concept_ids - set(concept_names.keys())
             if missing_ids:
-                name_rows = (
-                    db.query(ConceptName)
-                    .filter(
-                        ConceptName.concept_id.in_(missing_ids),
-                        ConceptName.voided == False,  # noqa: E712
-                    )
-                    .order_by(
-                        ConceptName.locale_preferred.desc(),
-                        ConceptName.concept_name_id.asc(),
-                    )
+                concepts = (
+                    db.query(Concept)
+                    .filter(Concept.concept_id.in_(missing_ids))
                     .all()
                 )
-                for name_row in name_rows:
-                    if name_row.concept_id not in concept_names:
-                        concept_names[name_row.concept_id] = name_row.name
+                for concept in concepts:
+                    concept_names[concept.concept_id] = (
+                        concept.short_name or f"Concept {concept.concept_id}"
+                    )
 
         by_day: Dict[str, list] = defaultdict(list)
         for row in rows:
