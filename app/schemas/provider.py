@@ -75,3 +75,22 @@ class ProviderListResponse(BaseModel):
     skip: int
     limit: int
 
+
+class ClinicalProviderLink(BaseModel):
+    """OpenMRS user linked to a provider for portal clinical profile."""
+
+    user_id: int
+    provider_id: int
+    given_name: Optional[str] = None
+    family_name: Optional[str] = None
+    display_name: Optional[str] = None
+
+
+class ClinicalProviderSearchResponse(BaseModel):
+    """Response for clinical provider name search."""
+
+    results: list[ClinicalProviderLink]
+    total_count: int
+    skip: int
+    limit: int
+

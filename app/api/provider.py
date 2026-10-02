@@ -19,6 +19,10 @@ from app.schemas import (
     ProviderResponse,
     ProviderListResponse,
 )
+from app.schemas.provider import (
+    ClinicalProviderLink,
+    ClinicalProviderSearchResponse,
+)
 from app.utils import validate_uuid
 
 router = APIRouter(tags=["providers"])
@@ -49,6 +53,67 @@ async def list_providers(
         raise HTTPException(
             status_code=400,
             detail=f"Failed to list providers: {str(e)}",
+        )
+
+
+@router.get("/clinical/search", response_model=ClinicalProviderSearchResponse)
+async def search_clinical_providers(
+    name: str = Query(..., description="Partial given or family name"),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(
+        20,
+        ge=1,
+        le=50,
+        description="Number of records to return",
+    ),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Search OpenMRS users with provider linkage by partial name match.
+    """
+    try:
+        return providers.search_clinical_providers(
+            db,
+            name=name,
+            skip=skip,
+            limit=limit,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to search clinical providers: {str(e)}",
+        )
+
+
+@router.get("/clinical/lookup", response_model=ClinicalProviderLink)
+async def lookup_clinical_provider(
+    user_id: int = Query(..., description="OpenMRS users.user_id"),
+    provider_id: int = Query(..., description="OpenMRS provider.provider_id"),
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_current_api_key),
+):
+    """
+    Resolve provider display name for OpenMRS user_id and provider_id.
+    """
+    try:
+        link = providers.lookup_clinical_provider(
+            db,
+            user_id=user_id,
+            provider_id=provider_id,
+        )
+        if not link:
+            raise HTTPException(
+                status_code=404,
+                detail="Clinical provider link not found",
+            )
+        return link
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to lookup clinical provider: {str(e)}",
         )
 
 
