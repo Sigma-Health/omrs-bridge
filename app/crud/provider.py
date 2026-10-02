@@ -5,16 +5,37 @@ Extends BaseCRUD with provider-specific functionality including person and name 
 
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, text
 
 from .base import BaseCRUD
 from app.models import Provider, Person, PersonName
 from app.schemas.provider import (
     ProviderResponse,
     ProviderListResponse,
+    ClinicalProviderLink,
+    ClinicalProviderSearchResponse,
     PersonInfo,
     PersonNameInfo,
 )
+
+_CLINICAL_PROVIDER_FROM = """
+FROM users u
+INNER JOIN provider p ON p.person_id = u.person_id
+  AND (p.retired = 0 OR p.retired IS NULL)
+INNER JOIN person_name pn ON pn.person_id = u.person_id
+  AND pn.voided = 0 AND pn.preferred = 1
+"""
+
+
+def escape_like_pattern(term: str) -> str:
+    """Escape SQL LIKE wildcards in user input."""
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def build_like_pattern(term: str) -> str:
+    """Build case-insensitive substring LIKE pattern."""
+    escaped = escape_like_pattern(term.strip())
+    return f"%{escaped}%"
 
 
 class ProvidersCRUD(BaseCRUD[Provider]):
@@ -241,3 +262,97 @@ class ProvidersCRUD(BaseCRUD[Provider]):
             skip=skip,
             limit=limit,
         )
+
+    def _row_to_clinical_link(self, row) -> ClinicalProviderLink:
+        given = row.given_name
+        family = row.family_name
+        parts = [p for p in (given, family) if p]
+        display = " ".join(parts) if parts else None
+        return ClinicalProviderLink(
+            user_id=row.user_id,
+            provider_id=row.provider_id,
+            given_name=given,
+            family_name=family,
+            display_name=display,
+        )
+
+    def search_clinical_providers(
+        self,
+        db: Session,
+        name: str,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> ClinicalProviderSearchResponse:
+        """
+        Search OpenMRS users with provider linkage by partial given/family name.
+        """
+        term = (name or "").strip()
+        if len(term) < 2:
+            return ClinicalProviderSearchResponse(
+                results=[],
+                total_count=0,
+                skip=skip,
+                limit=limit,
+            )
+
+        pattern = build_like_pattern(term)
+        name_filter = """
+          AND (
+            LOWER(pn.given_name) LIKE LOWER(:pattern) ESCAPE '\\\\'
+            OR LOWER(pn.family_name) LIKE LOWER(:pattern) ESCAPE '\\\\'
+            OR LOWER(CONCAT_WS(' ', pn.given_name, pn.family_name))
+              LIKE LOWER(:pattern) ESCAPE '\\\\'
+          )
+        """
+        base_where = f"""
+WHERE (u.retired = 0 OR u.retired IS NULL)
+  AND p.provider_id IS NOT NULL
+{name_filter}
+"""
+        count_sql = f"SELECT COUNT(*) AS cnt {_CLINICAL_PROVIDER_FROM} {base_where}"
+        count_row = db.execute(text(count_sql), {"pattern": pattern}).fetchone()
+        total_count = int(count_row.cnt) if count_row else 0
+
+        select_sql = f"""
+SELECT u.user_id, p.provider_id, pn.given_name, pn.family_name
+{_CLINICAL_PROVIDER_FROM}
+{base_where}
+ORDER BY pn.family_name, pn.given_name
+LIMIT :limit OFFSET :skip
+"""
+        rows = db.execute(
+            text(select_sql),
+            {"pattern": pattern, "limit": limit, "skip": skip},
+        ).fetchall()
+        results = [self._row_to_clinical_link(row) for row in rows]
+        return ClinicalProviderSearchResponse(
+            results=results,
+            total_count=total_count,
+            skip=skip,
+            limit=limit,
+        )
+
+    def lookup_clinical_provider(
+        self,
+        db: Session,
+        user_id: int,
+        provider_id: int,
+    ) -> Optional[ClinicalProviderLink]:
+        """
+        Resolve display name for an OpenMRS user_id + provider_id pair.
+        """
+        select_sql = f"""
+SELECT u.user_id, p.provider_id, pn.given_name, pn.family_name
+{_CLINICAL_PROVIDER_FROM}
+WHERE u.user_id = :user_id
+  AND p.provider_id = :provider_id
+  AND (u.retired = 0 OR u.retired IS NULL)
+LIMIT 1
+"""
+        row = db.execute(
+            text(select_sql),
+            {"user_id": user_id, "provider_id": provider_id},
+        ).fetchone()
+        if not row:
+            return None
+        return self._row_to_clinical_link(row)
