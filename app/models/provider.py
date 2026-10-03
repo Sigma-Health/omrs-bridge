@@ -30,6 +30,3 @@ class Provider(Base):
     date_retired = Column(DateTime, nullable=True)
     retire_reason = Column(Text, nullable=True)
     uuid = Column(String(38), unique=True, index=True)
-    role_id = Column(Integer, nullable=True)
-    speciality_id = Column(Integer, nullable=True)
-    provider_role_id = Column(Integer, nullable=True)

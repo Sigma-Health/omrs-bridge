@@ -11,7 +11,7 @@ class PersonNameInfo(BaseModel):
     """Schema for person name information"""
 
     person_name_id: int
-    preferred: bool
+    preferred: Optional[bool] = False
     prefix: Optional[str] = None
     given_name: Optional[str] = None
     middle_name: Optional[str] = None
@@ -52,9 +52,9 @@ class ProviderResponse(ProviderBase):
     """Schema for provider responses with person and name information"""
 
     provider_id: int
-    creator: int
-    date_created: datetime
-    uuid: str
+    creator: Optional[int] = None
+    date_created: Optional[datetime] = None
+    uuid: Optional[str] = None
     changed_by: Optional[int] = None
     date_changed: Optional[datetime] = None
     retired_by: Optional[int] = None
