@@ -17,14 +17,11 @@ from app.schemas.provider import (
     PersonInfo,
     PersonNameInfo,
 )
-
-_CLINICAL_PROVIDER_FROM = """
-FROM users u
-INNER JOIN provider p ON p.person_id = u.person_id
-  AND (p.retired = 0 OR p.retired IS NULL)
-INNER JOIN person_name pn ON pn.person_id = u.person_id
-  AND pn.voided = 0 AND pn.preferred = 1
-"""
+from app.sql.provider_sql import (
+    CLINICAL_PROVIDER_FROM,
+    PROVIDER_LIST_FROM,
+    PROVIDER_LIST_SELECT,
+)
 
 
 def escape_like_pattern(term: str) -> str:
@@ -186,9 +183,72 @@ class ProvidersCRUD(BaseCRUD[Provider]):
             date_retired=provider.date_retired,
             retire_reason=provider.retire_reason,
             uuid=provider.uuid,
-            role_id=provider.role_id,
-            speciality_id=provider.speciality_id,
-            provider_role_id=provider.provider_role_id,
+            person=person_info,
+            person_name=person_name_info,
+        )
+
+    def _build_full_name_from_row(self, row) -> Optional[str]:
+        name_parts = []
+        for attr in (
+            "name_prefix",
+            "given_name",
+            "middle_name",
+            "family_name_prefix",
+            "family_name",
+            "family_name2",
+            "family_name_suffix",
+            "name_degree",
+        ):
+            val = getattr(row, attr, None)
+            if val:
+                name_parts.append(val)
+        return " ".join(name_parts) if name_parts else None
+
+    def _provider_response_from_row(self, row) -> ProviderResponse:
+        person_info = None
+        if getattr(row, "join_person_id", None):
+            person_info = PersonInfo(
+                person_id=row.join_person_id,
+                uuid=row.person_uuid,
+                gender=row.person_gender,
+                birthdate=row.person_birthdate,
+                birthdate_estimated=row.person_birthdate_estimated,
+                dead=row.person_dead,
+                death_date=row.person_death_date,
+                voided=row.person_voided,
+            )
+
+        person_name_info = None
+        if getattr(row, "person_name_id", None):
+            full_name = self._build_full_name_from_row(row)
+            person_name_info = PersonNameInfo(
+                person_name_id=row.person_name_id,
+                preferred=bool(row.name_preferred) if row.name_preferred is not None else False,
+                prefix=row.name_prefix,
+                given_name=row.given_name,
+                middle_name=row.middle_name,
+                family_name_prefix=row.family_name_prefix,
+                family_name=row.family_name,
+                family_name2=row.family_name2,
+                family_name_suffix=row.family_name_suffix,
+                degree=row.name_degree,
+                full_name=full_name,
+            )
+
+        return ProviderResponse(
+            provider_id=row.provider_id,
+            person_id=row.person_id,
+            name=row.name,
+            identifier=row.identifier,
+            creator=row.creator,
+            date_created=row.date_created,
+            changed_by=row.changed_by,
+            date_changed=row.date_changed,
+            retired=bool(row.retired) if row.retired is not None else None,
+            retired_by=row.retired_by,
+            date_retired=row.date_retired,
+            retire_reason=row.retire_reason,
+            uuid=row.uuid,
             person=person_info,
             person_name=person_name_info,
         )
@@ -198,63 +258,54 @@ class ProvidersCRUD(BaseCRUD[Provider]):
     ) -> Optional[ProviderResponse]:
         """
         Get provider by ID with person and name information.
-
-        Args:
-            db: Database session
-            provider_id: Provider ID
-
-        Returns:
-            ProviderResponse with person and name information if found, None otherwise
         """
-        provider = self.get(db, provider_id)
-        if not provider:
+        sql = f"""
+{PROVIDER_LIST_SELECT}
+{PROVIDER_LIST_FROM}
+WHERE p.provider_id = :provider_id
+LIMIT 1
+"""
+        row = db.execute(text(sql), {"provider_id": provider_id}).fetchone()
+        if not row:
             return None
-
-        return self._enrich_provider(provider, db)
+        return self._provider_response_from_row(row)
 
     def get_by_uuid_with_details(
         self, db: Session, uuid: str
     ) -> Optional[ProviderResponse]:
         """
         Get provider by UUID with person and name information.
-
-        Args:
-            db: Database session
-            uuid: Provider UUID
-
-        Returns:
-            ProviderResponse with person and name information if found, None otherwise
         """
-        provider = self.get_by_uuid(db, uuid)
-        if not provider:
+        sql = f"""
+{PROVIDER_LIST_SELECT}
+{PROVIDER_LIST_FROM}
+WHERE p.uuid = :uuid
+LIMIT 1
+"""
+        row = db.execute(text(sql), {"uuid": uuid}).fetchone()
+        if not row:
             return None
-
-        return self._enrich_provider(provider, db)
+        return self._provider_response_from_row(row)
 
     def list_with_details(
         self, db: Session, skip: int = 0, limit: int = 100
     ) -> ProviderListResponse:
         """
-        List providers with person and name information.
-
-        Args:
-            db: Database session
-            skip: Number of records to skip
-            limit: Maximum number of records to return
-
-        Returns:
-            ProviderListResponse with enriched provider information
+        List providers with person and name information (OpenMRS SQL).
         """
-        # Get total count
-        total_count = db.query(self.model).count()
+        count_row = db.execute(
+            text("SELECT COUNT(*) AS cnt FROM provider p"),
+        ).fetchone()
+        total_count = int(count_row.cnt) if count_row else 0
 
-        # Get providers
-        providers = self.list(db, skip=skip, limit=limit)
-
-        # Enrich each provider
-        enriched_providers = [
-            self._enrich_provider(provider, db) for provider in providers
-        ]
+        sql = f"""
+{PROVIDER_LIST_SELECT}
+{PROVIDER_LIST_FROM}
+ORDER BY p.provider_id
+LIMIT :limit OFFSET :skip
+"""
+        rows = db.execute(text(sql), {"limit": limit, "skip": skip}).fetchall()
+        enriched_providers = [self._provider_response_from_row(row) for row in rows]
 
         return ProviderListResponse(
             providers=enriched_providers,
@@ -298,26 +349,27 @@ class ProvidersCRUD(BaseCRUD[Provider]):
         pattern = build_like_pattern(term)
         name_filter = """
           AND (
-            LOWER(pn.given_name) LIKE LOWER(:pattern) ESCAPE '\\\\'
-            OR LOWER(pn.family_name) LIKE LOWER(:pattern) ESCAPE '\\\\'
+            LOWER(COALESCE(pn.given_name, '')) LIKE LOWER(:pattern)
+            OR LOWER(COALESCE(pn.family_name, '')) LIKE LOWER(:pattern)
             OR LOWER(CONCAT_WS(' ', pn.given_name, pn.family_name))
-              LIKE LOWER(:pattern) ESCAPE '\\\\'
+              LIKE LOWER(:pattern)
           )
         """
         base_where = f"""
-WHERE (u.retired = 0 OR u.retired IS NULL)
-  AND p.provider_id IS NOT NULL
+WHERE p.provider_id IS NOT NULL
+  AND COALESCE(p.retired, 0) = 0
+  AND COALESCE(u.retired, 0) = 0
 {name_filter}
 """
-        count_sql = f"SELECT COUNT(*) AS cnt {_CLINICAL_PROVIDER_FROM} {base_where}"
+        count_sql = f"SELECT COUNT(*) AS cnt {CLINICAL_PROVIDER_FROM} {base_where}"
         count_row = db.execute(text(count_sql), {"pattern": pattern}).fetchone()
         total_count = int(count_row.cnt) if count_row else 0
 
         select_sql = f"""
 SELECT u.user_id, p.provider_id, pn.given_name, pn.family_name
-{_CLINICAL_PROVIDER_FROM}
+{CLINICAL_PROVIDER_FROM}
 {base_where}
-ORDER BY pn.family_name, pn.given_name
+ORDER BY pn.family_name, pn.given_name, u.user_id
 LIMIT :limit OFFSET :skip
 """
         rows = db.execute(
@@ -343,10 +395,9 @@ LIMIT :limit OFFSET :skip
         """
         select_sql = f"""
 SELECT u.user_id, p.provider_id, pn.given_name, pn.family_name
-{_CLINICAL_PROVIDER_FROM}
+{CLINICAL_PROVIDER_FROM}
 WHERE u.user_id = :user_id
   AND p.provider_id = :provider_id
-  AND (u.retired = 0 OR u.retired IS NULL)
 LIMIT 1
 """
         row = db.execute(
